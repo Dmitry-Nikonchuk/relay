@@ -1,18 +1,51 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import js from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import next from '@next/eslint-plugin-next';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
+import prettier from 'eslint-config-prettier';
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+export default [
+  js.configs.recommended,
 
-export default eslintConfig;
+  // TypeScript (TS + TSX)
+  ...tseslint.configs.recommended,
+
+  // Отключает правила, конфликтующие с Prettier
+  prettier,
+
+  // Next + React rules
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      '@next/next': next,
+      react,
+      'react-hooks': reactHooks,
+    },
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+    settings: {
+      react: { version: 'detect' },
+    },
+    rules: {
+      // React 17+ (Next) — не требуем import React
+      'react/react-in-jsx-scope': 'off',
+
+      // Hooks
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
+  },
+
+  // Игноры
+  {
+    ignores: ['.next/**', 'node_modules/**', 'dist/**', 'out/**', 'coverage/**'],
+  },
+];
