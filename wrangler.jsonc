@@ -3,23 +3,29 @@
   "main": ".open-next/worker.js",
   "name": "relay",
   "compatibility_date": "2026-02-24",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
   },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "relay"
-    }
+      "service": "relay",
+    },
   ],
   "images": {
-    "binding": "IMAGES"
+    "binding": "IMAGES",
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "relay-db",
+      "database_id": "b34821be-e7ad-4e13-81e5-3e6599b9634b",
+      "preview_database_id": "local",
+    },
+  ],
 }

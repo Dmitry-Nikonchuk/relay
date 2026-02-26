@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "predev": "wrangler d1 migrations apply DB --local",
     "dev": "next dev",
     "start": "next start",
     "lint": "eslint .",
@@ -15,7 +16,10 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:status": "wrangler d1 migrations list DB"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
