@@ -38,7 +38,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@cloudflare/workers-types": "^4.20260305.0",
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.1.6",
