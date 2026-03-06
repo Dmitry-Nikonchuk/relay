@@ -2,6 +2,7 @@ import { ZodError, treeifyError } from 'zod';
 
 import { chatService } from '@/services/chat.service';
 import { ChatCompleteRequestDtoSchema } from '@/dto/chat.dto';
+import { getMessageContent } from '@/lib/ai/messageContent';
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +16,8 @@ export async function POST(req: Request) {
       maxTokens: dto.maxTokens,
     });
 
-    const content = response.choices?.[0]?.message?.content ?? '';
+    const message = response.choices?.[0]?.message;
+    const content = getMessageContent(message ?? undefined);
 
     return Response.json({ content, raw: response });
   } catch (error) {

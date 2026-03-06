@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AiChatResponse } from '@/lib/ai/types';
 
 export const AiRoleSchema = z.enum(['system', 'user', 'assistant']);
 
@@ -14,4 +15,10 @@ export const ChatCompleteRequestDtoSchema = z.object({
   maxTokens: z.number().int().positive().optional(),
 });
 
+export const ChatCompleteResponseDtoSchema = z.object({
+  content: z.string(),
+  raw: z.custom<AiChatResponse>().optional(),
+});
+
 export type ChatCompleteRequestDto = z.infer<typeof ChatCompleteRequestDtoSchema>;
+export type ChatCompleteResponseDto = z.infer<typeof ChatCompleteResponseDtoSchema>;

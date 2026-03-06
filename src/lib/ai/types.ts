@@ -13,8 +13,16 @@ export type AiChatRequest = {
   stream?: boolean;
 };
 
+/** Message shape from provider; may include reasoning (e.g. OpenRouter) */
+export type AiAssistantMessage = {
+  role: 'assistant';
+  content?: string | null;
+  reasoning?: string | null;
+  reasoning_details?: unknown;
+};
+
 export type AiChatChoice = {
-  message: { role: 'assistant'; content: string };
+  message: AiAssistantMessage;
 };
 
 export type AiChatResponse = {
