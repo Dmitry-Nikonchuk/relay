@@ -5,7 +5,7 @@ import {
   mapChatMessagesToCompleteRequestDto,
   mapChatCompleteResponseDtoToChatMessage,
 } from '@/domain/chat/chat.mapper';
-import { ChatCompleteResponseDto } from '@/dto/chat.dto';
+import { ChatCompleteResponseDto, GenerateTitleResponseDto } from '@/dto/chat.dto';
 import { ChatMessage } from '@/domain/chat/chat.types';
 
 export const chatApi = {
@@ -16,5 +16,13 @@ export const chatApi = {
     });
 
     return mapChatCompleteResponseDtoToChatMessage(response);
+  },
+
+  async generateChatTitle(messageText: string) {
+    const response = await httpClient.post<GenerateTitleResponseDto>('/api/chat/generateTitle', {
+      body: JSON.stringify({ messageText }),
+    });
+
+    return response.chatTitle;
   },
 };

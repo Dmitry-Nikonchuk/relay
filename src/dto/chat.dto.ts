@@ -20,5 +20,15 @@ export const ChatCompleteResponseDtoSchema = z.object({
   raw: z.custom<AiChatResponse>().optional(),
 });
 
+export const GenerateTitleRequestDtoSchema = z.object({
+  messageText: z.string().min(1),
+});
+
+export const GenerateTitleResponseDtoSchema = z.object({
+  chatTitle: z.string().min(1),
+});
+
 export type ChatCompleteRequestDto = z.infer<typeof ChatCompleteRequestDtoSchema>;
 export type ChatCompleteResponseDto = z.infer<typeof ChatCompleteResponseDtoSchema>;
+export type GenerateTitleRequestDto = z.infer<typeof GenerateTitleRequestDtoSchema>;
+export type GenerateTitleResponseDto = z.infer<typeof GenerateTitleResponseDtoSchema>;

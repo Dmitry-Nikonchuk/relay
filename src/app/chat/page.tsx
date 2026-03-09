@@ -10,9 +10,12 @@ import { ChatMessage } from '@/domain/chat/chat.types';
 import { chatApi } from '@/shared/api/chatApi';
 import { cn } from '@/shared/lib/cn';
 
+const DEFAULT_CHAT_TITLE = 'Relay Chat';
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [chatTitle, setChatTitle] = useState(DEFAULT_CHAT_TITLE);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,14 +27,22 @@ export default function ChatPage() {
     const newMessages = [...messages, { role: 'user', content: inputText } as ChatMessage];
 
     setMessages(newMessages);
+
+    if (!chatTitle || chatTitle === DEFAULT_CHAT_TITLE) {
+      const chatTitle = await chatApi.generateChatTitle(inputText);
+      setChatTitle(chatTitle);
+    }
+
     setInputText('');
 
-    const assistantMessage = await chatApi.sendMessages(newMessages);
+    const assistantMessage = await chatApi.sendMessages(
+      newMessages.concat({ role: 'system', content: `Chat title: ${chatTitle}` }),
+    );
     setMessages((old) => [...old, assistantMessage]);
   };
 
   return (
-    <div className="min-h-screen flex justify-center py-6 px-3 bg-bg">
+    <div className="min-h-screen max-h-screen overflow-hidden flex justify-center py-6 px-3 bg-bg">
       <div className="w-full max-w-[1120px] flex gap-4 items-stretch">
         <aside className="w-[280px] shrink-0 flex flex-col rounded-lg border border-border bg-gradient-to-br from-white to-[#f4f5ff] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.04),0_0_0_1px_rgba(148,163,184,0.04)]">
           <div className="flex items-center gap-2 mb-4">
@@ -51,20 +62,21 @@ export default function ChatPage() {
         <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.08),0_0_0_1px_rgba(148,163,184,0.08)] overflow-hidden">
           <header className="flex items-center justify-between pt-4 pb-3 px-5 border-b border-border">
             <div className="flex flex-col gap-1">
-              <h1 className="m-0 text-xl font-semibold tracking-tight">Relay Chat</h1>
+              <h1 className="m-0 text-xl font-semibold tracking-tight">{chatTitle}</h1>
             </div>
           </header>
 
-          <div className="flex-1 p-4 px-5 flex flex-col gap-3 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(139,126,219,0.09),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.09),transparent_55%)]">
+          <div className="flex-1 p-4 px-5 flex flex-col gap-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(139,126,219,0.09),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.09),transparent_55%)]">
             {messages.map((message, index) => (
               <div
                 key={index}
                 className={cn(
-                  'flex flex-col gap-2',
-                  message.role === 'user' ? 'items-end' : 'items-start',
+                  'inline-flex flex-col gap-2 w-auto px-4 py-2',
+                  message.role === 'user'
+                    ? 'self-end items-end bg-slate-100 rounded-lg max-w-[50%]'
+                    : 'self-start items-start',
                 )}
               >
-                <div className="text-sm font-medium">{message.role}</div>
                 {message.role === 'assistant' ? (
                   <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                     <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -83,7 +95,7 @@ export default function ChatPage() {
             <div className="flex gap-2 items-end">
               <Textarea
                 className="resize-none min-h-[56px] max-h-[140px] text-sm"
-                placeholder="Сформулируйте запрос или вставьте контекст для модели..."
+                placeholder="Ask me anything..."
                 rows={2}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
