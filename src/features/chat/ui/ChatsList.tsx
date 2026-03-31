@@ -1,36 +1,84 @@
-import { useState } from 'react';
+import { type FC, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { Chat } from '@/entities/chat';
-import { MenuList } from '@/shared/ui/MenuList';
 import { Modal } from '@/shared/ui/Modal';
 import { CirclePlus } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
+import { Input } from '@/shared/ui/Input';
+import { cn } from '@/shared/lib/cn';
+import ChatItemDropdownMenu from './ChatItemDropdownMenu';
 
-export function ChatsList({
-  chats,
-  onChatClick,
-  onCreateChat,
-  onDeleteChat,
-  selectedChatId,
-}: {
+type Props = {
   chats: Chat[];
   onChatClick: (chatId: string) => void;
   onCreateChat: () => void;
   onDeleteChat: (chatId: string) => void;
+  onRenameChat: (chatId: string, title: string) => void;
   selectedChatId: string | null;
-}) {
+};
+
+export const ChatsList: FC<Props> = ({
+  chats,
+  onChatClick,
+  onCreateChat,
+  onDeleteChat,
+  onRenameChat,
+  selectedChatId,
+}) => {
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [deleteChatId, setDeleteChatId] = useState<string | null>(null);
-  const handleDeleteClick = (chatId: string) => {
+  const [renameChatId, setRenameChatId] = useState<string | null>(null);
+  const [renameInputValue, setRenameInputValue] = useState<string>('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    if (!renameChatId) {
+      return;
+    }
+    const el = renameInputRef.current;
+    if (!el) {
+      return;
+    }
+    el.focus();
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }, [renameChatId]);
+
+  const handleDeleteClick = useCallback((chatId: string) => {
     setDeleteChatId(chatId);
     setOpenDeleteConfirm(true);
-  };
-  const handleConfirmDelete = () => {
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
     if (deleteChatId) {
       onDeleteChat(deleteChatId);
       setOpenDeleteConfirm(false);
       setDeleteChatId(null);
     }
-  };
+  }, [deleteChatId, onDeleteChat]);
+
+  const handleRenameChat = useCallback(
+    (chatId: string) => {
+      setRenameChatId(chatId);
+      setRenameInputValue(chats?.find(({ id }) => id === chatId)?.title || '');
+    },
+    [chats],
+  );
+
+  const handleSubmitRename = useCallback(
+    async (newText: string) => {
+      if (!renameChatId) return;
+      if (newText === chats?.find(({ id }) => id === selectedChatId)?.title) {
+        setRenameChatId(null);
+        setRenameInputValue('');
+        return;
+      }
+      onRenameChat(renameChatId, newText);
+      setRenameChatId(null);
+      setRenameInputValue('');
+    },
+    [chats, onRenameChat, renameChatId, selectedChatId],
+  );
+
   return (
     <>
       {chats.length > 0 ? (
@@ -42,15 +90,37 @@ export function ChatsList({
             </button>
           </div>
           <div className="flex flex-col rounded-md bg-surface/60 max-h-[420px] overflow-y-auto gap-1.5 py-1">
-            <MenuList
-              items={chats.map((chat) => ({
-                id: chat.id,
-                label: chat.title,
-                onClick: () => onChatClick(chat.id),
-              }))}
-              activeItemId={selectedChatId}
-              onDeleteClick={handleDeleteClick}
-            />
+            <div className="flex flex-col gap-2">
+              {chats.map((item) => {
+                return (
+                  <div
+                    className={cn(
+                      'group text-left overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 rounded-md pr-8 relative',
+                      selectedChatId === item.id && 'text-primary bg-primary/10',
+                      'cursor-pointer',
+                    )}
+                    key={item.id}
+                    onClick={() => onChatClick?.(item.id)}
+                  >
+                    {renameChatId === item.id ? (
+                      <Input
+                        ref={renameInputRef}
+                        value={renameInputValue}
+                        onChange={(e) => setRenameInputValue(e.target.value)}
+                        onBlur={(e) => handleSubmitRename(e.target.value)}
+                        onPressEnter={() => handleSubmitRename(renameInputValue)}
+                      />
+                    ) : (
+                      item.title
+                    )}
+                    <ChatItemDropdownMenu
+                      onDelete={() => handleDeleteClick?.(item.id)}
+                      onRename={() => handleRenameChat(item.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : null}
@@ -68,5 +138,4 @@ export function ChatsList({
       ></Modal>
     </>
   );
-  return;
-}
+};
