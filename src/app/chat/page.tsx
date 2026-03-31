@@ -1,45 +1,20 @@
 'use client';
-import { FormEvent, useState } from 'react';
 import Image from 'next/image';
-import ReactMarkdown from 'react-markdown';
-
-import { Button } from '@/shared/ui/Button';
-import { Textarea } from '@/shared/ui/Textarea';
-
-import { ChatMessage } from '@/domain/chat/chat.types';
-import { chatApi } from '@/shared/api/chatApi';
-import { cn } from '@/shared/lib/cn';
-
-const DEFAULT_CHAT_TITLE = 'Relay Chat';
+import { ChatForm, MessagesStack, ChatsList, useChat } from '@/features/chat';
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [chatTitle, setChatTitle] = useState(DEFAULT_CHAT_TITLE);
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!inputText.trim()) {
-      return;
-    }
-
-    const newMessages = [...messages, { role: 'user', content: inputText } as ChatMessage];
-
-    setMessages(newMessages);
-
-    if (!chatTitle || chatTitle === DEFAULT_CHAT_TITLE) {
-      const chatTitle = await chatApi.generateChatTitle(inputText);
-      setChatTitle(chatTitle);
-    }
-
-    setInputText('');
-
-    const assistantMessage = await chatApi.sendMessages(
-      newMessages.concat({ role: 'system', content: `Chat title: ${chatTitle}` }),
-    );
-    setMessages((old) => [...old, assistantMessage]);
-  };
+  const {
+    messages,
+    chatTitle,
+    sendMessage,
+    chats,
+    setSelectedChatId,
+    selectedChatId,
+    startNewChat,
+    isAssistantLoading,
+    messagesScrollEpoch,
+    deleteChat,
+  } = useChat();
 
   return (
     <div className="min-h-screen max-h-screen overflow-hidden flex justify-center py-6 px-3 bg-bg">
@@ -55,56 +30,30 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="text-[11px] uppercase tracking-widest text-muted mb-1">Recents chats</div>
-          <div className="flex flex-col gap-1.5"></div>
+          <ChatsList
+            chats={chats}
+            onChatClick={setSelectedChatId}
+            onCreateChat={startNewChat}
+            onDeleteChat={deleteChat}
+            selectedChatId={selectedChatId}
+          />
         </aside>
 
-        <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.08),0_0_0_1px_rgba(148,163,184,0.08)] overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.08),0_0_0_1px_rgba(148,163,184,0.08)] overflow-hidden pb-4">
           <header className="flex items-center justify-between pt-4 pb-3 px-5 border-b border-border">
             <div className="flex flex-col gap-1">
               <h1 className="m-0 text-xl font-semibold tracking-tight">{chatTitle}</h1>
             </div>
           </header>
-
-          <div className="flex-1 p-4 px-5 flex flex-col gap-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(139,126,219,0.09),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.09),transparent_55%)]">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={cn(
-                  'inline-flex flex-col gap-2 w-auto px-4 py-2',
-                  message.role === 'user'
-                    ? 'self-end items-end bg-slate-100 rounded-lg max-w-[50%]'
-                    : 'self-start items-start',
-                )}
-              >
-                {message.role === 'assistant' ? (
-                  <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="text-sm">{message.content}</div>
-                )}
-              </div>
-            ))}
+          <div className="flex-1 overflow-hidden overflow-y-auto">
+            <MessagesStack
+              messages={messages}
+              isAssistantLoading={isAssistantLoading}
+              messagesScrollEpoch={messagesScrollEpoch}
+            />
           </div>
 
-          <form
-            className="flex flex-col gap-2 py-3 px-5 border-t border-border bg-gradient-to-t from-slate-50/96 to-slate-50/92"
-            onSubmit={handleSubmit}
-          >
-            <div className="flex gap-2 items-end">
-              <Textarea
-                className="resize-none min-h-[56px] max-h-[140px] text-sm"
-                placeholder="Ask me anything..."
-                rows={2}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-              />
-              <Button type="submit" disabled={!inputText.trim()}>
-                Send
-              </Button>
-            </div>
-          </form>
+          <ChatForm onSubmit={sendMessage} disabled={isAssistantLoading} />
         </div>
       </div>
     </div>

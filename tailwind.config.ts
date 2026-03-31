@@ -1,13 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 export default {
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/ui/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/shared/ui/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
@@ -28,6 +22,10 @@ export default {
         4: '16px',
         5: '20px',
         6: '24px',
+        7: '28px',
+        8: '32px',
+        9: '36px',
+        10: '40px',
       },
       borderRadius: {
         sm: '6px',
