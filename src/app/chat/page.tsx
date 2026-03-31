@@ -14,6 +14,7 @@ export default function ChatPage() {
     isAssistantLoading,
     messagesScrollEpoch,
     deleteChat,
+    renameChat,
   } = useChat();
 
   return (
@@ -35,6 +36,7 @@ export default function ChatPage() {
             onChatClick={setSelectedChatId}
             onCreateChat={startNewChat}
             onDeleteChat={deleteChat}
+            onRenameChat={renameChat}
             selectedChatId={selectedChatId}
           />
         </aside>

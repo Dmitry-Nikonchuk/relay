@@ -49,6 +49,10 @@ export const ChatAppendMessageRequestDtoSchema = z.object({
   content: z.string().min(1),
 });
 
+export const ChatRenameRequestDtoSchema = z.object({
+  title: z.string().min(1),
+});
+
 export type ChatCompleteRequestDto = z.infer<typeof ChatCompleteRequestDtoSchema>;
 export type ChatCompleteResponseDto = z.infer<typeof ChatCompleteResponseDtoSchema>;
 export type GenerateTitleRequestDto = z.infer<typeof GenerateTitleRequestDtoSchema>;
@@ -57,3 +61,4 @@ export type ChatCreateRequestDto = z.infer<typeof ChatCreateRequestDtoSchema>;
 export type ChatCreateResponseDto = z.infer<typeof ChatCreateResponseDtoSchema>;
 export type ChatUpdateTitleRequestDto = z.infer<typeof ChatUpdateTitleRequestDtoSchema>;
 export type ChatAppendMessageRequestDto = z.infer<typeof ChatAppendMessageRequestDtoSchema>;
+export type ChatRenameRequestDto = z.infer<typeof ChatRenameRequestDtoSchema>;

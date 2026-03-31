@@ -1,7 +1,11 @@
 import { ZodError, treeifyError } from 'zod';
 
 import { batchExecute, execute, queryOne, queryAll } from '@/shared/lib/db/client';
-import { ChatCreateRequestDtoSchema, ChatUpdateTitleRequestDtoSchema } from '@/entities/chat';
+import {
+  ChatCreateRequestDtoSchema,
+  ChatUpdateTitleRequestDtoSchema,
+  ChatRenameRequestDtoSchema,
+} from '@/entities/chat';
 
 /** Temporary ID until auth exists; must exist in `users` because of FK. */
 const DEV_USER_ID = '1';
@@ -104,5 +108,32 @@ export async function handleDeleteChat(req: Request, chatId: string) {
     }
 
     console.error(error);
+  }
+}
+
+export async function handleRenameChat(req: Request, chatId: string) {
+  try {
+    const body = await req.json();
+    const dto = ChatRenameRequestDtoSchema.parse(body);
+
+    const row = await queryOne<{ id: string }>(
+      'SELECT id FROM chats WHERE id = ? AND user_id = ?',
+      [chatId, DEV_USER_ID],
+    );
+    if (!row) {
+      return Response.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    await execute('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?', [
+      dto.title,
+      now,
+      chatId,
+    ]);
+
+    return Response.json({ id: chatId, title: dto.title, updatedAt: now });
+  } catch (error) {
+    console.error(error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChatMessage } from '@/entities/chat';
+import { Chat, ChatMessage } from '@/entities/chat';
 import { chatApi } from '../lib/chatApi';
 import { chatQueryKeys } from '../lib/queryKeys';
 import { DEFAULT_CHAT_TITLE, PLACEHOLDER_CHAT_TITLE } from '../lib/constants';
@@ -64,6 +64,46 @@ export const useChat = () => {
       await queryClient.invalidateQueries({ queryKey: chatQueryKeys.list() });
     },
     [selectedChatId, startNewChat, queryClient],
+  );
+
+  const renameChat = useCallback(
+    async (chatId: string, newText: string) => {
+      const title = newText.trim();
+      if (!title) {
+        return;
+      }
+
+      const queryKey = chatQueryKeys.list();
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousChats = queryClient.getQueryData<Chat[]>(queryKey);
+
+      queryClient.setQueryData<Chat[]>(queryKey, (current = []) =>
+        current.map((chat) => (chat.id === chatId ? { ...chat, title } : chat)),
+      );
+
+      if (selectedChatId === chatId) {
+        setChatTitle(title);
+      }
+
+      try {
+        await chatApi.updateChatTitle(chatId, title);
+      } catch (error) {
+        if (previousChats) {
+          queryClient.setQueryData(queryKey, previousChats);
+          if (selectedChatId === chatId) {
+            const previousSelectedChatTitle = previousChats.find(
+              (chat) => chat.id === chatId,
+            )?.title;
+            setChatTitle(previousSelectedChatTitle ?? DEFAULT_CHAT_TITLE);
+          }
+        }
+        throw error;
+      } finally {
+        await queryClient.invalidateQueries({ queryKey });
+      }
+    },
+    [queryClient, selectedChatId],
   );
 
   const sendMessage = async (inputText: string) => {
@@ -146,6 +186,7 @@ export const useChat = () => {
     setSelectedChatId,
     startNewChat,
     deleteChat,
+    renameChat,
     isAssistantLoading,
     messagesScrollEpoch,
   };
