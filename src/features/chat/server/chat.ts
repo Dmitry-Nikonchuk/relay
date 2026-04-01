@@ -5,6 +5,7 @@ import {
   ChatCreateRequestDtoSchema,
   ChatUpdateTitleRequestDtoSchema,
   ChatRenameRequestDtoSchema,
+  type ChatListRow,
 } from '@/entities/chat';
 
 /** Temporary ID until auth exists; must exist in `users` because of FK. */
@@ -44,10 +45,15 @@ export async function handleCreateChat(req: Request) {
   }
 }
 
-export async function handleListChats() {
-  const chats = await queryAll('SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC', [
+/** Shared by GET `/api/chat` and RSC (initial chat list). */
+export async function listChatsForDevUser(): Promise<ChatListRow[]> {
+  return queryAll<ChatListRow>('SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC', [
     DEV_USER_ID,
   ]);
+}
+
+export async function handleListChats() {
+  const chats = await listChatsForDevUser();
   return Response.json(chats);
 }
 
