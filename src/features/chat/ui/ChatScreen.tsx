@@ -34,8 +34,11 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
       return;
     }
     setMessages(initialMessages);
-    setMessagesScrollEpoch((n) => n + 1);
   }, [initialMessages, isSendInProgress]);
+
+  useEffect(() => {
+    setMessagesScrollEpoch((n) => n + 1);
+  }, [chatIdFromUrl]);
 
   useEffect(() => {
     if (!chatIdFromUrl) {
@@ -180,7 +183,7 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
               <h1 className="m-0 text-xl font-semibold tracking-tight">{chatTitle}</h1>
             </div>
           </header>
-          <div className="flex-1 overflow-hidden overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <MessagesStack
               messages={messages}
               isAssistantLoading={isSendInProgress}
