@@ -1,4 +1,7 @@
-import { type FC, useState, useCallback, useRef, useLayoutEffect } from 'react';
+'use client';
+
+import type { FC } from 'react';
+import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { Chat } from '@/entities/chat';
 import { Modal } from '@/shared/ui/Modal';
 import { CirclePlus } from 'lucide-react';

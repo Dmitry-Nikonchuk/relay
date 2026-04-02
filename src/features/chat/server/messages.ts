@@ -14,6 +14,21 @@ async function assertChatOwnedByUser(chatId: string): Promise<boolean> {
   return row != null;
 }
 
+/** Used by RSC and GET `/api/chat/history` — loads full history for a chat (owned by dev user). */
+export async function listMessagesForChat(chatId: string): Promise<ChatMessage[] | null> {
+  const owned = await assertChatOwnedByUser(chatId);
+  if (!owned) {
+    return null;
+  }
+
+  const rows = await queryAll<{ role: ChatMessage['role']; content: string }>(
+    'SELECT role, content FROM messages WHERE chat_id = ? ORDER BY created_at ASC',
+    [chatId],
+  );
+
+  return rows as ChatMessage[];
+}
+
 export async function handleGetMessages(req: Request) {
   try {
     const url = new URL(req.url);
@@ -22,17 +37,12 @@ export async function handleGetMessages(req: Request) {
       return Response.json({ error: 'Missing chatId' }, { status: 400 });
     }
 
-    const owned = await assertChatOwnedByUser(chatId);
-    if (!owned) {
+    const messages = await listMessagesForChat(chatId);
+    if (!messages) {
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const rows = await queryAll<{ role: ChatMessage['role']; content: string }>(
-      'SELECT role, content FROM messages WHERE chat_id = ? ORDER BY created_at ASC',
-      [chatId],
-    );
-
-    return Response.json(rows as ChatMessage[]);
+    return Response.json(messages);
   } catch (error) {
     console.error(error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });

@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
+  "build": {
+    "command": "npx opennextjs-cloudflare build",
+  },
   "name": "relay",
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat"],
