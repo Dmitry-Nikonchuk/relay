@@ -8,12 +8,31 @@ export const ChatMessageDtoSchema = z.object({
   content: z.string().min(1),
 });
 
-export const ChatCompleteRequestDtoSchema = z.object({
-  messages: z.array(ChatMessageDtoSchema).min(1),
-  model: z.string().min(1).optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().positive().optional(),
+export const ChatHistoryMessageDtoSchema = z.object({
+  id: z.string().min(1),
+  role: AiRoleSchema,
+  content: z.string(),
+  createdAt: z.string().min(1),
 });
+
+export const ChatHistoryPageResponseDtoSchema = z.object({
+  messages: z.array(ChatHistoryMessageDtoSchema),
+  hasMore: z.boolean(),
+});
+
+export const ChatCompleteRequestDtoSchema = z
+  .object({
+    chatId: z.string().min(1).optional(),
+    messages: z.array(ChatMessageDtoSchema).optional(),
+    model: z.string().min(1).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().int().positive().optional(),
+  })
+  .refine(
+    (d) =>
+      (d.chatId != null && d.chatId.length > 0) || (d.messages != null && d.messages.length >= 1),
+    { message: 'Provide chatId or at least one message', path: ['messages'] },
+  );
 
 export const ChatCompleteResponseDtoSchema = z.object({
   content: z.string(),
@@ -54,6 +73,7 @@ export const ChatRenameRequestDtoSchema = z.object({
 });
 
 export type ChatCompleteRequestDto = z.infer<typeof ChatCompleteRequestDtoSchema>;
+export type ChatHistoryPageResponseDto = z.infer<typeof ChatHistoryPageResponseDtoSchema>;
 export type ChatCompleteResponseDto = z.infer<typeof ChatCompleteResponseDtoSchema>;
 export type GenerateTitleRequestDto = z.infer<typeof GenerateTitleRequestDtoSchema>;
 export type GenerateTitleResponseDto = z.infer<typeof GenerateTitleResponseDtoSchema>;

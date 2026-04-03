@@ -10,6 +10,7 @@ import {
   ChatListRow,
   ChatCompleteResponseDto,
   ChatCreateResponseDto,
+  ChatHistoryPageResponseDto,
   GenerateTitleResponseDto,
 } from '@/entities/chat';
 
@@ -28,12 +29,10 @@ export const chatApi = {
     return mapChatCompleteResponseDtoToChatMessage(response);
   },
 
-  async streamMessages(messages: ChatMessage[], onDelta: (chunk: string) => void): Promise<string> {
-    const dto = mapChatMessagesToCompleteRequestDto(messages);
-
+  async streamMessages(chatId: string, onDelta: (chunk: string) => void): Promise<string> {
     const res = await httpClient.stream('/api/chat/stream', {
       method: 'POST',
-      body: JSON.stringify(dto),
+      body: JSON.stringify({ chatId }),
     });
 
     const reader = res.body!.getReader();
@@ -113,9 +112,16 @@ export const chatApi = {
     return mapChatCreateResponseDtoToChat(response);
   },
 
-  async fetchMessages(chatId: string): Promise<ChatMessage[]> {
-    const qs = new URLSearchParams({ chatId });
-    return httpClient.get<ChatMessage[]>(`/api/chat/history?${qs.toString()}`);
+  async fetchMessagesPage(
+    chatId: string,
+    opts: { limit: number; before?: { createdAt: string; id: string } },
+  ): Promise<ChatHistoryPageResponseDto> {
+    const qs = new URLSearchParams({ chatId, limit: String(opts.limit) });
+    if (opts.before) {
+      qs.set('beforeCreatedAt', opts.before.createdAt);
+      qs.set('beforeId', opts.before.id);
+    }
+    return httpClient.get<ChatHistoryPageResponseDto>(`/api/chat/history?${qs.toString()}`);
   },
 
   async appendMessage(chatId: string, role: ChatMessage['role'], content: string) {

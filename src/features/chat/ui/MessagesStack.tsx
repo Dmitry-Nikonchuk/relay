@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useLayoutEffect, useMemo, useRef } from 'react';
+import { forwardRef, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { Virtuoso, type ListProps, type VirtuosoHandle } from 'react-virtuoso';
 import { ChatMessage } from '@/entities/chat';
 import { cn } from '@/shared/lib/cn';
@@ -25,11 +25,20 @@ export function MessagesStack({
   messages,
   isAssistantLoading = false,
   messagesScrollEpoch = 0,
+  firstItemIndex,
+  onLoadOlder,
+  hasOlder = false,
+  isLoadingOlder = false,
 }: {
   messages: ChatMessage[];
   isAssistantLoading?: boolean;
   /** Increments when the open chat changes — scroll list to bottom (not after each server refresh or stream end). */
   messagesScrollEpoch?: number;
+  /** For prepending older messages without jumping scroll (Virtuoso inverse list). */
+  firstItemIndex?: number;
+  onLoadOlder?: () => void | Promise<void>;
+  hasOlder?: boolean;
+  isLoadingOlder?: boolean;
 }) {
   const last = messages[messages.length - 1];
 
@@ -48,6 +57,16 @@ export function MessagesStack({
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const prevLoadingRef = useRef(false);
+
+  const handleAtTopStateChange = useCallback(
+    (atTop: boolean) => {
+      if (!atTop || !hasOlder || isLoadingOlder || !onLoadOlder) {
+        return;
+      }
+      void onLoadOlder();
+    },
+    [hasOlder, isLoadingOlder, onLoadOlder],
+  );
 
   useLayoutEffect(() => {
     if (isAssistantLoading) {
@@ -94,6 +113,12 @@ export function MessagesStack({
   const components = useMemo(
     () => ({
       List: MessagesVirtuosoList,
+      Header: () =>
+        isLoadingOlder ? (
+          <div className="box-border px-5 py-3 text-center text-xs text-muted">
+            Loading earlier messages…
+          </div>
+        ) : null,
       Footer: () => (
         <div className="px-5">
           {isAssistantLoading ? (
@@ -122,7 +147,7 @@ export function MessagesStack({
         </div>
       ),
     }),
-    [assistantStreamText, isAssistantLoading, showThinkingLoader],
+    [assistantStreamText, isAssistantLoading, isLoadingOlder, showThinkingLoader],
   );
 
   return (
@@ -132,12 +157,14 @@ export function MessagesStack({
         className="min-h-0 flex-1"
         style={{ height: '100%' }}
         data={listMessages}
+        {...(firstItemIndex != null ? { firstItemIndex } : {})}
         alignToBottom
         increaseViewportBy={{ top: 200, bottom: 400 }}
         components={components}
+        atTopStateChange={onLoadOlder ? handleAtTopStateChange : undefined}
         itemContent={(index, message) => (
           <div
-            key={`${message.role}-${index}-${message.content.slice(0, 32)}`}
+            key={message.id ?? `${message.role}-${index}-${message.content.slice(0, 32)}`}
             className="mb-7 flex w-full flex-col"
           >
             <div
