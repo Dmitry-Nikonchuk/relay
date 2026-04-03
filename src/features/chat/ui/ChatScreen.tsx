@@ -2,10 +2,15 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chat, ChatMessage } from '@/entities/chat';
 import { chatApi } from '../lib/chatApi';
-import { DEFAULT_CHAT_TITLE, PLACEHOLDER_CHAT_TITLE } from '../lib/constants';
+import {
+  DEFAULT_CHAT_TITLE,
+  MESSAGE_PAGE_DEFAULT_LIMIT,
+  PLACEHOLDER_CHAT_TITLE,
+  VIRTUOSO_FIRST_ITEM_INDEX,
+} from '../lib/constants';
 import { ChatForm } from './ChatForm';
 import { MessagesStack } from './MessagesStack';
 import { ChatsList } from './ChatsList';
@@ -13,28 +18,48 @@ import { ChatsList } from './ChatsList';
 type Props = {
   initialChats: Chat[];
   initialMessages: ChatMessage[];
+  initialMessagesHasMore: boolean;
   /** `?chatId=` from URL; `null` when absent or not in list */
   chatIdFromUrl: string | null;
 };
 
-export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Props) {
+export function ChatScreen({
+  initialChats,
+  initialMessages,
+  initialMessagesHasMore,
+  chatIdFromUrl,
+}: Props) {
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>(initialChats);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [hasOlderMessages, setHasOlderMessages] = useState(initialMessagesHasMore);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [firstItemIndex, setFirstItemIndex] = useState(VIRTUOSO_FIRST_ITEM_INDEX);
   const [chatTitle, setChatTitle] = useState<string>(DEFAULT_CHAT_TITLE);
   const [isSendInProgress, setIsSendInProgress] = useState(false);
   const [messagesScrollEpoch, setMessagesScrollEpoch] = useState(0);
+  const prevChatIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     setChats(initialChats);
   }, [initialChats]);
 
   useEffect(() => {
+    if (prevChatIdRef.current === undefined) {
+      prevChatIdRef.current = chatIdFromUrl;
+      return;
+    }
+    if (prevChatIdRef.current === chatIdFromUrl) {
+      return;
+    }
+    prevChatIdRef.current = chatIdFromUrl;
     if (isSendInProgress) {
       return;
     }
     setMessages(initialMessages);
-  }, [initialMessages, isSendInProgress]);
+    setHasOlderMessages(initialMessagesHasMore);
+    setFirstItemIndex(VIRTUOSO_FIRST_ITEM_INDEX);
+  }, [chatIdFromUrl, initialMessages, initialMessagesHasMore, isSendInProgress]);
 
   useEffect(() => {
     setMessagesScrollEpoch((n) => n + 1);
@@ -50,6 +75,31 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
       setChatTitle(chat.title);
     }
   }, [chatIdFromUrl, chats]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!chatIdFromUrl || !hasOlderMessages || isLoadingOlderMessages) {
+      return;
+    }
+    const first = messages[0];
+    if (!first?.id || !first?.createdAt) {
+      return;
+    }
+
+    setIsLoadingOlderMessages(true);
+    try {
+      const page = await chatApi.fetchMessagesPage(chatIdFromUrl, {
+        limit: MESSAGE_PAGE_DEFAULT_LIMIT,
+        before: { createdAt: first.createdAt, id: first.id },
+      });
+      const existingIds = new Set(messages.map((m) => m.id).filter(Boolean));
+      const older = page.messages.filter((m) => m.id && !existingIds.has(m.id));
+      setMessages((prev) => [...older, ...prev]);
+      setHasOlderMessages(page.hasMore);
+      setFirstItemIndex((i) => i - older.length);
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  }, [chatIdFromUrl, hasOlderMessages, isLoadingOlderMessages, messages]);
 
   const startNewChat = useCallback(() => {
     router.push('/chat');
@@ -105,23 +155,6 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
     try {
       let accumulated = '';
 
-      const streamPromise = chatApi.streamMessages(newMessages, (chunk) => {
-        accumulated += chunk;
-
-        setMessages((prev) => {
-          const next = [...prev];
-          const last = next[next.length - 1];
-
-          if (last && last.role === 'assistant') {
-            next[next.length - 1] = { ...last, content: accumulated };
-          } else {
-            next.push({ role: 'assistant', content: accumulated } as ChatMessage);
-          }
-
-          return next;
-        });
-      });
-
       const setupPromise = (async (): Promise<string | number> => {
         if (!currentChatId) {
           const chat = await chatApi.createChat({ title: PLACEHOLDER_CHAT_TITLE });
@@ -137,7 +170,24 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
         return currentChatId;
       })();
 
-      const [chatIdForAssistant, fullText] = await Promise.all([setupPromise, streamPromise]);
+      const chatIdForAssistant = await setupPromise;
+
+      const fullText = await chatApi.streamMessages(String(chatIdForAssistant), (chunk) => {
+        accumulated += chunk;
+
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+
+          if (last && last.role === 'assistant') {
+            next[next.length - 1] = { ...last, content: accumulated };
+          } else {
+            next.push({ role: 'assistant', content: accumulated } as ChatMessage);
+          }
+
+          return next;
+        });
+      });
 
       await chatApi.appendMessage(String(chatIdForAssistant), 'assistant', fullText);
       router.refresh();
@@ -188,6 +238,10 @@ export function ChatScreen({ initialChats, initialMessages, chatIdFromUrl }: Pro
               messages={messages}
               isAssistantLoading={isSendInProgress}
               messagesScrollEpoch={messagesScrollEpoch}
+              firstItemIndex={firstItemIndex}
+              onLoadOlder={chatIdFromUrl ? loadOlderMessages : undefined}
+              hasOlder={hasOlderMessages}
+              isLoadingOlder={isLoadingOlderMessages}
             />
           </div>
 
