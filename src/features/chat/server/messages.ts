@@ -4,6 +4,7 @@ import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
 import { ChatAppendMessageRequestDtoSchema } from '@/entities/chat';
 import type { ChatMessage } from '@/entities/chat';
 import { MESSAGE_PAGE_DEFAULT_LIMIT, MESSAGE_PAGE_MAX_LIMIT } from '@/features/chat/lib/constants';
+import { estimateMessageTokenCount, maybeUpdateChatMemory } from './chatMemory';
 
 const DEV_USER_ID = '1';
 
@@ -113,9 +114,7 @@ export async function listMessagesPageBefore(
   };
 }
 
-/**
- * Full history for the model (pagination-independent). Extend here later for summarization / token caps.
- */
+/** Full message history for the main chat model (stream by `chatId`). */
 export async function getMessagesForModelCompletion(chatId: string): Promise<ChatMessage[] | null> {
   const owned = await assertChatOwnedByUser(chatId);
   if (!owned) {
@@ -193,12 +192,24 @@ export async function handleAppendMessage(req: Request) {
 
     const messageId = crypto.randomUUID();
     const now = new Date().toISOString();
+    const tokenCount = estimateMessageTokenCount(dto.content);
 
     await execute(
-      'INSERT INTO messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)',
-      [messageId, dto.chatId, dto.role, dto.content, now],
+      `INSERT INTO messages
+        (id, chat_id, role, content, created_at, token_count, metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [messageId, dto.chatId, dto.role, dto.content, now, tokenCount, null],
     );
     await execute('UPDATE chats SET updated_at = ? WHERE id = ?', [now, dto.chatId]);
+
+    if (dto.role === 'assistant') {
+      void maybeUpdateChatMemory(dto.chatId).catch((error) => {
+        console.warn('[chat-memory] async update failed', {
+          chatId: dto.chatId,
+          error: error instanceof Error ? error.message : 'unknown-error',
+        });
+      });
+    }
 
     return Response.json({ id: messageId });
   } catch (error) {

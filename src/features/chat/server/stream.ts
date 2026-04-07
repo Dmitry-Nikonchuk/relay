@@ -2,15 +2,14 @@ import { ZodError, treeifyError } from 'zod';
 
 import { ChatCompleteRequestDtoSchema } from '@/entities/chat';
 import { chatService } from '@/shared/lib/ai/chat.service';
-import { getMessagesForModelCompletion } from '@/features/chat/server/messages';
+import { buildChatContext } from '@/features/chat/server/chatMemory';
 
 export async function handleStream(req: Request) {
   try {
     const body = await req.json();
     const dto = ChatCompleteRequestDtoSchema.parse(body);
 
-    const messages =
-      dto.chatId != null ? await getMessagesForModelCompletion(dto.chatId) : dto.messages;
+    const messages = dto.chatId != null ? await buildChatContext(dto.chatId) : dto.messages;
 
     if (dto.chatId != null && (!messages || messages.length < 1)) {
       return Response.json({ error: 'Not found' }, { status: 404 });

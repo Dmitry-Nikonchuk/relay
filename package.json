@@ -20,7 +20,8 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "db:status": "wrangler d1 migrations list DB"
+    "db:status": "wrangler d1 migrations list DB",
+    "bench:summary-models": "node scripts/benchmark-summary-models.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -39,8 +40,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
     "react-virtuoso": "^4.12.5",
+    "remark-gfm": "^4.0.0",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
   },

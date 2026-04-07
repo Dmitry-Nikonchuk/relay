@@ -11,6 +11,8 @@ export type AiChatRequest = {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  /** OpenRouter: extra HTTP retries on 429/502/503 (default from OPENROUTER_MAX_RETRIES or 8). */
+  maxRetries?: number;
 };
 
 /** Message shape from provider; may include reasoning (e.g. OpenRouter) */
