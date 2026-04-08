@@ -4,12 +4,12 @@ import { ChatCompleteRequestDtoSchema } from '@/entities/chat';
 import { chatService } from '@/shared/lib/ai/chat.service';
 import { buildChatContext } from '@/features/chat/server/chatMemory';
 
-export async function handleStream(req: Request) {
+export async function handleStream(req: Request, userId: string) {
   try {
     const body = await req.json();
     const dto = ChatCompleteRequestDtoSchema.parse(body);
 
-    const messages = dto.chatId != null ? await buildChatContext(dto.chatId) : dto.messages;
+    const messages = dto.chatId != null ? await buildChatContext(dto.chatId, userId) : dto.messages;
 
     if (dto.chatId != null && (!messages || messages.length < 1)) {
       return Response.json({ error: 'Not found' }, { status: 404 });

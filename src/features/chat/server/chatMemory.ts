@@ -21,8 +21,6 @@ import { getMessageContent } from '@/shared/lib/ai/messageContent';
 import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
 import { buildChatMemorySummaryPrompt } from './prompts/chatMemorySummaryPrompt';
 
-const DEV_USER_ID = '1';
-
 const BASE_CHAT_SYSTEM_PROMPT = [
   'You are Relay, a helpful assistant.',
   'Use the provided memory and recent messages as conversation context.',
@@ -124,10 +122,10 @@ function formatMemoryForContext(memory: ChatMemory): string | null {
   ].join('\n');
 }
 
-async function assertChatOwnedByUser(chatId: string): Promise<boolean> {
+async function assertChatOwnedByUser(chatId: string, userId: string): Promise<boolean> {
   const row = await queryOne<{ id: string }>('SELECT id FROM chats WHERE id = ? AND user_id = ?', [
     chatId,
-    DEV_USER_ID,
+    userId,
   ]);
 
   return row != null;
@@ -253,9 +251,10 @@ async function summarizeDeltaChunk(
 
 export async function buildChatContext(
   chatId: string,
+  userId: string,
   currentUserMessage?: string,
 ): Promise<ChatMessage[] | null> {
-  const owned = await assertChatOwnedByUser(chatId);
+  const owned = await assertChatOwnedByUser(chatId, userId);
   if (!owned) {
     return null;
   }
@@ -295,7 +294,12 @@ export async function buildChatContext(
   return context;
 }
 
-export async function maybeUpdateChatMemory(chatId: string): Promise<void> {
+export async function maybeUpdateChatMemory(chatId: string, userId: string): Promise<void> {
+  const owned = await assertChatOwnedByUser(chatId, userId);
+  if (!owned) {
+    return;
+  }
+
   const memory = await getMemoryFromBackfill(chatId);
   const unsummarized = await listUnsummarizedMessages(
     chatId,

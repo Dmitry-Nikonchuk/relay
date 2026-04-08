@@ -14,6 +14,7 @@ import {
 import { ChatForm } from './ChatForm';
 import { MessagesStack } from './MessagesStack';
 import { ChatsList } from './ChatsList';
+import { ChatSidebarProfile, type ChatSidebarUser } from './ChatSidebarProfile';
 
 type Props = {
   initialChats: Chat[];
@@ -21,6 +22,7 @@ type Props = {
   initialMessagesHasMore: boolean;
   /** `?chatId=` from URL; `null` when absent or not in list */
   chatIdFromUrl: string | null;
+  currentUser: ChatSidebarUser;
 };
 
 export function ChatScreen({
@@ -28,6 +30,7 @@ export function ChatScreen({
   initialMessages,
   initialMessagesHasMore,
   chatIdFromUrl,
+  currentUser,
 }: Props) {
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>(initialChats);
@@ -206,9 +209,9 @@ export function ChatScreen({
   return (
     <div className="min-h-screen max-h-screen overflow-hidden flex justify-center py-6 px-3 bg-bg">
       <div className="w-full max-w-[1120px] flex gap-4 items-stretch">
-        <aside className="w-[280px] shrink-0 flex flex-col rounded-lg border border-border bg-gradient-to-br from-white to-[#f4f5ff] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.04),0_0_0_1px_rgba(148,163,184,0.04)]">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-[42px] h-[42px] rounded-lg flex items-center justify-center overflow-hidden">
+        <aside className="flex min-h-0 w-[280px] shrink-0 flex-col self-stretch rounded-lg border border-border bg-gradient-to-br from-white to-[#f4f5ff] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.04),0_0_0_1px_rgba(148,163,184,0.04)]">
+          <div className="mb-4 flex shrink-0 items-center gap-2">
+            <div className="flex h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-lg">
               <Image src="/logo.png" alt="Relay logo" width={36} height={36} />
             </div>
             <div className="flex flex-col gap-0.5">
@@ -217,14 +220,17 @@ export function ChatScreen({
             </div>
           </div>
 
-          <ChatsList
-            chats={chats}
-            onChatClick={selectChat}
-            onCreateChat={startNewChat}
-            onDeleteChat={deleteChat}
-            onRenameChat={renameChat}
-            selectedChatId={chatIdFromUrl}
-          />
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <ChatsList
+              chats={chats}
+              onChatClick={selectChat}
+              onCreateChat={startNewChat}
+              onDeleteChat={deleteChat}
+              onRenameChat={renameChat}
+              selectedChatId={chatIdFromUrl}
+            />
+            <ChatSidebarProfile user={currentUser} />
+          </div>
         </aside>
 
         <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.08),0_0_0_1px_rgba(148,163,184,0.08)] overflow-hidden pb-4">

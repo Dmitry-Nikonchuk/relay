@@ -8,10 +8,7 @@ import {
   type ChatListRow,
 } from '@/entities/chat';
 
-/** Temporary ID until auth exists; must exist in `users` because of FK. */
-const DEV_USER_ID = '1';
-
-export async function handleCreateChat(req: Request) {
+export async function handleCreateChat(req: Request, userId: string) {
   try {
     const body = JSON.parse(await req.text());
     const dto = ChatCreateRequestDtoSchema.parse(body);
@@ -21,13 +18,9 @@ export async function handleCreateChat(req: Request) {
 
     await batchExecute([
       {
-        query: 'INSERT OR IGNORE INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)',
-        params: [DEV_USER_ID, 'Local User', 'local@relay.dev', now],
-      },
-      {
         query:
           'INSERT INTO chats (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        params: [chatId, DEV_USER_ID, dto.title, now, now],
+        params: [chatId, userId, dto.title, now, now],
       },
     ]);
 
@@ -46,25 +39,25 @@ export async function handleCreateChat(req: Request) {
 }
 
 /** Shared by GET `/api/chat` and RSC (initial chat list). */
-export async function listChatsForDevUser(): Promise<ChatListRow[]> {
+export async function listChatsForUser(userId: string): Promise<ChatListRow[]> {
   return queryAll<ChatListRow>('SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC', [
-    DEV_USER_ID,
+    userId,
   ]);
 }
 
-export async function handleListChats() {
-  const chats = await listChatsForDevUser();
+export async function handleListChats(userId: string) {
+  const chats = await listChatsForUser(userId);
   return Response.json(chats);
 }
 
-export async function handleUpdateChatTitle(req: Request, chatId: string) {
+export async function handleUpdateChatTitle(req: Request, chatId: string, userId: string) {
   try {
     const body = await req.json();
     const dto = ChatUpdateTitleRequestDtoSchema.parse(body);
 
     const row = await queryOne<{ id: string }>(
       'SELECT id FROM chats WHERE id = ? AND user_id = ?',
-      [chatId, DEV_USER_ID],
+      [chatId, userId],
     );
     if (!row) {
       return Response.json({ error: 'Not found' }, { status: 404 });
@@ -91,11 +84,11 @@ export async function handleUpdateChatTitle(req: Request, chatId: string) {
   }
 }
 
-export async function handleDeleteChat(req: Request, chatId: string) {
+export async function handleDeleteChat(req: Request, chatId: string, userId: string) {
   try {
     const row = await queryOne<{ id: string }>(
       'SELECT id FROM chats WHERE id = ? AND user_id = ?',
-      [chatId, DEV_USER_ID],
+      [chatId, userId],
     );
     if (!row) {
       return Response.json({ error: 'Not found' }, { status: 404 });
@@ -114,17 +107,18 @@ export async function handleDeleteChat(req: Request, chatId: string) {
     }
 
     console.error(error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function handleRenameChat(req: Request, chatId: string) {
+export async function handleRenameChat(req: Request, chatId: string, userId: string) {
   try {
     const body = await req.json();
     const dto = ChatRenameRequestDtoSchema.parse(body);
 
     const row = await queryOne<{ id: string }>(
       'SELECT id FROM chats WHERE id = ? AND user_id = ?',
-      [chatId, DEV_USER_ID],
+      [chatId, userId],
     );
     if (!row) {
       return Response.json({ error: 'Not found' }, { status: 404 });

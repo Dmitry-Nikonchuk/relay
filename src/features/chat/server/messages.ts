@@ -6,12 +6,10 @@ import type { ChatMessage } from '@/entities/chat';
 import { MESSAGE_PAGE_DEFAULT_LIMIT, MESSAGE_PAGE_MAX_LIMIT } from '@/features/chat/lib/constants';
 import { estimateMessageTokenCount, maybeUpdateChatMemory } from './chatMemory';
 
-const DEV_USER_ID = '1';
-
-async function assertChatOwnedByUser(chatId: string): Promise<boolean> {
+async function assertChatOwnedByUser(chatId: string, userId: string): Promise<boolean> {
   const row = await queryOne<{ id: string }>('SELECT id FROM chats WHERE id = ? AND user_id = ?', [
     chatId,
-    DEV_USER_ID,
+    userId,
   ]);
   return row != null;
 }
@@ -56,8 +54,9 @@ export type ListMessagesPageResult = {
 export async function listMessagesLatestPage(
   chatId: string,
   limit: number,
+  userId: string,
 ): Promise<ListMessagesPageResult | null> {
-  const owned = await assertChatOwnedByUser(chatId);
+  const owned = await assertChatOwnedByUser(chatId, userId);
   if (!owned) {
     return null;
   }
@@ -88,8 +87,9 @@ export async function listMessagesPageBefore(
   chatId: string,
   limit: number,
   cursor: MessagePageCursor,
+  userId: string,
 ): Promise<ListMessagesPageResult | null> {
-  const owned = await assertChatOwnedByUser(chatId);
+  const owned = await assertChatOwnedByUser(chatId, userId);
   if (!owned) {
     return null;
   }
@@ -115,8 +115,11 @@ export async function listMessagesPageBefore(
 }
 
 /** Full message history for the main chat model (stream by `chatId`). */
-export async function getMessagesForModelCompletion(chatId: string): Promise<ChatMessage[] | null> {
-  const owned = await assertChatOwnedByUser(chatId);
+export async function getMessagesForModelCompletion(
+  chatId: string,
+  userId: string,
+): Promise<ChatMessage[] | null> {
+  const owned = await assertChatOwnedByUser(chatId, userId);
   if (!owned) {
     return null;
   }
@@ -129,7 +132,7 @@ export async function getMessagesForModelCompletion(chatId: string): Promise<Cha
   return rows as ChatMessage[];
 }
 
-export async function handleGetMessages(req: Request) {
+export async function handleGetMessages(req: Request, userId: string) {
   try {
     const url = new URL(req.url);
     const chatId = url.searchParams.get('chatId');
@@ -151,10 +154,15 @@ export async function handleGetMessages(req: Request) {
         );
       }
 
-      const page = await listMessagesPageBefore(chatId, limit, {
-        beforeCreatedAt,
-        beforeId,
-      });
+      const page = await listMessagesPageBefore(
+        chatId,
+        limit,
+        {
+          beforeCreatedAt,
+          beforeId,
+        },
+        userId,
+      );
       if (!page) {
         return Response.json({ error: 'Not found' }, { status: 404 });
       }
@@ -165,7 +173,7 @@ export async function handleGetMessages(req: Request) {
       });
     }
 
-    const page = await listMessagesLatestPage(chatId, limit);
+    const page = await listMessagesLatestPage(chatId, limit, userId);
     if (!page) {
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
@@ -180,12 +188,12 @@ export async function handleGetMessages(req: Request) {
   }
 }
 
-export async function handleAppendMessage(req: Request) {
+export async function handleAppendMessage(req: Request, userId: string) {
   try {
     const body = await req.json();
     const dto = ChatAppendMessageRequestDtoSchema.parse(body);
 
-    const owned = await assertChatOwnedByUser(dto.chatId);
+    const owned = await assertChatOwnedByUser(dto.chatId, userId);
     if (!owned) {
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
@@ -203,7 +211,7 @@ export async function handleAppendMessage(req: Request) {
     await execute('UPDATE chats SET updated_at = ? WHERE id = ?', [now, dto.chatId]);
 
     if (dto.role === 'assistant') {
-      void maybeUpdateChatMemory(dto.chatId).catch((error) => {
+      void maybeUpdateChatMemory(dto.chatId, userId).catch((error) => {
         console.warn('[chat-memory] async update failed', {
           chatId: dto.chatId,
           error: error instanceof Error ? error.message : 'unknown-error',

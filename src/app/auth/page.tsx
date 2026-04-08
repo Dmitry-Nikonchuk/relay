@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Sora } from 'next/font/google';
 
+import { SignInWithGoogle } from '@/features/auth/ui/SignInWithGoogle';
+import { auth } from '@/auth';
+import { AuthDivider } from '@/shared/ui/AuthDivider';
 import { Button } from '@/shared/ui/Button';
+import { Field } from '@/shared/ui/Field';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -15,65 +20,76 @@ export const metadata: Metadata = {
   description: 'Access Relay to continue into your AI chat workspace.',
 };
 
-export default function AuthPage() {
+function safeCallbackUrl(raw: string | undefined): string {
+  if (raw == null || raw === '' || !raw.startsWith('/') || raw.startsWith('//')) {
+    return '/chat';
+  }
+  return raw;
+}
+
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl: rawCallback } = await searchParams;
+  const callbackUrl = safeCallbackUrl(rawCallback);
+
+  const session = await auth();
+  if (session?.user) {
+    redirect(callbackUrl);
+  }
+
   return (
     <main
       className={`${sora.className} landing-bg relative min-h-screen overflow-hidden px-5 py-10 md:px-8`}
     >
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col gap-8">
         <header className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 text-xl font-semibold tracking-tight">
             <Image src="/logo.png" alt="Relay logo" width={42} height={42} className="rounded-md" />
             <span className="text-text">Relay</span>
           </Link>
-          <Button href="/chat" variant="secondary" size="sm">
-            Skip to chat
+          <Button href="/" variant="secondary" size="sm">
+            Back to home
           </Button>
         </header>
 
         <section className="landing-glass-card p-7 md:p-10">
           <p className="inline-flex rounded-full border border-white/60 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Authentication Entry
+            Sign in
           </p>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight">Welcome to Relay</h1>
-          <p className="mt-3 max-w-2xl text-muted">
-            Choose how you want to continue. In the next iteration, these actions will connect to a
-            real auth provider and then redirect to your chat workspace.
+          <h1 className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">Welcome to Relay</h1>
+          <p className="mt-3 text-muted">
+            One step with Google: first time creates your account; next time you are signed back in.
+            No separate registration form.
           </p>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <article className="landing-glass-card p-5">
-              <h2 className="text-2xl font-semibold">Log in</h2>
-              <p className="mt-2 text-sm text-muted">
-                Return to your existing Relay account and continue your previous conversations.
-              </p>
-              <div className="mt-5">
-                <Button
-                  href="/chat"
-                  variant="primary"
-                  className="w-full px-4 py-3 text-center text-sm"
-                >
-                  Continue to chat
-                </Button>
-              </div>
-            </article>
-
-            <article className="landing-glass-card p-5">
-              <h2 className="text-2xl font-semibold">Sign up</h2>
-              <p className="mt-2 text-sm text-muted">
-                Create your Relay account and start organizing your AI conversations from day one.
-              </p>
-              <div className="mt-5">
-                <Button
-                  href="/chat"
-                  variant="secondary"
-                  className="w-full px-4 py-3 text-center text-sm"
-                >
-                  Create account
-                </Button>
-              </div>
-            </article>
+          <div className="mt-8">
+            <SignInWithGoogle callbackUrl={callbackUrl} />
           </div>
+
+          <AuthDivider label="Why one button" />
+
+          <Field
+            label="Log in and sign up"
+            hint="We use Google only for now so you can start quickly. Email and password may be added later."
+          >
+            <p className="rounded-md border border-border bg-surface/80 px-3 py-2 text-sm text-text">
+              Your chats stay tied to your Relay account. Sessions use secure cookies (see{' '}
+              <Link
+                href="/privacy"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                privacy &amp; cookies
+              </Link>
+              ).
+            </p>
+          </Field>
+
+          <p className="mt-8 text-center text-xs text-muted">
+            By continuing you agree that Relay may set session cookies to keep you signed in.
+          </p>
         </section>
       </div>
     </main>
