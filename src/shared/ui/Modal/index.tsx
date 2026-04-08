@@ -184,12 +184,6 @@ export function Modal({
   return createPortal(content, document.body);
 }
 
-const secondaryBtn =
-  'inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50';
-
-const dangerBtn =
-  'inline-flex items-center justify-center rounded-md border border-red-600 bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-50';
-
 export type ModalConfirmProps = {
   open: boolean;
   onClose: () => void;
@@ -245,20 +239,26 @@ export function ModalConfirm({
       size="sm"
       footer={
         <>
-          <button type="button" className={secondaryBtn} onClick={onClose} disabled={loading}>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={loading}>
             {cancelLabel}
-          </button>
+          </Button>
           {confirmVariant === 'danger' ? (
-            <button
+            <Button
+              variant="danger"
               type="button"
-              className={dangerBtn}
               onClick={() => void handleConfirm()}
               disabled={loading}
             >
               {confirmLabel}
-            </button>
+            </Button>
           ) : (
-            <Button type="button" onClick={() => void handleConfirm()} disabled={loading}>
+            <Button
+              variant="primary"
+              size="sm"
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={loading}
+            >
               {confirmLabel}
             </Button>
           )}
