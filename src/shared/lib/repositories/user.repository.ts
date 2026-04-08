@@ -5,8 +5,8 @@ interface UserRow {
   email: string;
   name: string;
   created_at: string;
-  updated_at: string;
-  deleted_at: string;
+  email_verified: string | null;
+  image: string | null;
 }
 
 export async function getUserById(id: string) {

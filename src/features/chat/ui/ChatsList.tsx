@@ -84,49 +84,51 @@ export const ChatsList: FC<Props> = ({
 
   return (
     <>
-      {chats.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex align-center justify-between mb-1.5">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-muted">Your chats</div>
-            <button className="text-muted size-5 hover:text-slate-900" onClick={onCreateChat}>
-              <CirclePlus size={16} />
-            </button>
-          </div>
-          <div className="flex flex-col rounded-md bg-surface/60 max-h-[420px] overflow-y-auto gap-1.5 py-1">
-            <div className="flex flex-col gap-2">
-              {chats.map((item) => {
-                return (
-                  <div
-                    className={cn(
-                      'group text-left overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 rounded-md pr-8 relative',
-                      selectedChatId === item.id && 'text-primary bg-primary/10',
-                      'cursor-pointer',
-                    )}
-                    key={item.id}
-                    onClick={() => onChatClick?.(item.id)}
-                  >
-                    {renameChatId === item.id ? (
-                      <Input
-                        ref={renameInputRef}
-                        value={renameInputValue}
-                        onChange={(e) => setRenameInputValue(e.target.value)}
-                        onBlur={(e) => handleSubmitRename(e.target.value)}
-                        onPressEnter={() => handleSubmitRename(renameInputValue)}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {chats.length > 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="mb-1.5 flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-muted">Your chats</div>
+              <button className="size-5 text-muted hover:text-slate-900" onClick={onCreateChat}>
+                <CirclePlus size={16} />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto rounded-md bg-surface/60 py-1">
+              <div className="flex flex-col gap-2">
+                {chats.map((item) => {
+                  return (
+                    <div
+                      className={cn(
+                        'group text-left overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 rounded-md pr-8 relative',
+                        selectedChatId === item.id && 'text-primary bg-primary/10',
+                        'cursor-pointer',
+                      )}
+                      key={item.id}
+                      onClick={() => onChatClick?.(item.id)}
+                    >
+                      {renameChatId === item.id ? (
+                        <Input
+                          ref={renameInputRef}
+                          value={renameInputValue}
+                          onChange={(e) => setRenameInputValue(e.target.value)}
+                          onBlur={(e) => handleSubmitRename(e.target.value)}
+                          onPressEnter={() => handleSubmitRename(renameInputValue)}
+                        />
+                      ) : (
+                        item.title
+                      )}
+                      <ChatItemDropdownMenu
+                        onDelete={() => handleDeleteClick?.(item.id)}
+                        onRename={() => handleRenameChat(item.id)}
                       />
-                    ) : (
-                      item.title
-                    )}
-                    <ChatItemDropdownMenu
-                      onDelete={() => handleDeleteClick?.(item.id)}
-                      onRename={() => handleRenameChat(item.id)}
-                    />
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <Modal
         open={openDeleteConfirm}
         onClose={() => setOpenDeleteConfirm(false)}

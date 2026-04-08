@@ -1,9 +1,18 @@
 import { handleAppendMessage, handleGetMessages } from '@/features/chat/server/messages';
+import { getSessionUserId } from '@/shared/lib/auth/require-user';
 
 export async function GET(req: Request) {
-  return handleGetMessages(req);
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return handleGetMessages(req, userId);
 }
 
 export async function POST(req: Request) {
-  return handleAppendMessage(req);
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return handleAppendMessage(req, userId);
 }
