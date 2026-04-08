@@ -36,7 +36,7 @@ export function ChatForm({
           disabled={disabled}
           onChange={(e) => setInputText(e.target.value)}
         />
-        <Button type="submit" disabled={!inputText.trim() || disabled}>
+        <Button type="submit" variant="primary" size="sm" disabled={!inputText.trim() || disabled}>
           Send
         </Button>
       </div>

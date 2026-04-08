@@ -134,8 +134,12 @@ export const ChatsList: FC<Props> = ({
         description="Are you sure you want to delete this chat?"
         footer={
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setOpenDeleteConfirm(false)}>Cancel</Button>
-            <Button onClick={handleConfirmDelete}>Delete</Button>
+            <Button variant="secondary" size="sm" onClick={() => setOpenDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
           </div>
         }
       ></Modal>

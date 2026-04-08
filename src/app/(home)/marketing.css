@@ -1,0 +1,232 @@
+/* Marketing / landing utilities (plain CSS so this file can load after globals without @tailwind in the same entry). */
+
+.landing-bg {
+  background:
+    radial-gradient(
+      800px circle at 8% -10%,
+      color-mix(in srgb, var(--color-primary) 20%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px circle at 92% 0%,
+      color-mix(in srgb, var(--color-primary) 16%, white),
+      transparent 60%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg) 86%, white), var(--color-bg));
+}
+
+.landing-hero-glow {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 420px;
+  width: min(960px, 95vw);
+  transform: translateX(-50%);
+  background:
+    radial-gradient(
+      60% 62% at 50% 22%,
+      color-mix(in srgb, var(--color-primary) 24%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      42% 55% at 72% 32%,
+      color-mix(in srgb, var(--color-primary) 14%, white),
+      transparent 72%
+    );
+  filter: blur(16px);
+  pointer-events: none;
+}
+
+.landing-glass-card {
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, white);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--color-surface) 90%, white),
+    color-mix(in srgb, var(--color-surface) 72%, transparent)
+  );
+  box-shadow:
+    0 18px 50px rgba(18, 18, 40, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(16px);
+  border-radius: 1.25rem;
+}
+
+.landing-nav-link {
+  display: inline-block;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  transition:
+    color 200ms,
+    background 200ms;
+}
+
+.landing-nav-link:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.landing-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  transition:
+    transform 300ms,
+    background 300ms,
+    box-shadow 300ms;
+  background: linear-gradient(
+    130deg,
+    var(--color-primary),
+    color-mix(in srgb, var(--color-primary) 70%, #cad0ff)
+  );
+  box-shadow:
+    0 14px 34px color-mix(in srgb, var(--color-primary) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.landing-btn-primary:hover {
+  background: linear-gradient(
+    130deg,
+    var(--color-primary-hover),
+    color-mix(in srgb, var(--color-primary-hover) 66%, #ced4ff)
+  );
+  transform: translateY(-1px);
+}
+
+.landing-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border-width: 1px;
+  border-style: solid;
+  font-weight: 600;
+  transition:
+    transform 300ms,
+    border-color 300ms,
+    box-shadow 300ms;
+  border-color: color-mix(in srgb, var(--color-border) 88%, white);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-surface) 84%, transparent);
+  box-shadow:
+    0 12px 26px rgba(17, 17, 35, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.46);
+}
+
+.landing-btn-secondary:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.landing-step-card {
+  border-radius: 1rem;
+  border-width: 1px;
+  border-style: solid;
+  padding: 1.25rem;
+  transition:
+    transform 300ms,
+    border-color 300ms;
+  border-color: color-mix(in srgb, var(--color-border) 86%, white);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+
+.landing-step-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.landing-step-badge {
+  display: inline-flex;
+  height: 2rem;
+  min-width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+.landing-benefit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border-width: 1px;
+  border-style: solid;
+  padding: 1rem;
+  transition:
+    transform 300ms,
+    border-color 300ms;
+  border-color: color-mix(in srgb, var(--color-border) 86%, white);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+.landing-benefit-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+}
+
+.landing-benefit-dot {
+  margin-top: 7px;
+  height: 8px;
+  width: 8px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  flex-shrink: 0;
+}
+
+.landing-cta-panel {
+  background:
+    radial-gradient(130% 180% at 0% 0%, rgba(255, 255, 255, 0.26), transparent 55%),
+    radial-gradient(80% 130% at 100% 100%, rgba(255, 255, 255, 0.16), transparent 58%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 90%, #332f56),
+      color-mix(in srgb, var(--color-primary-hover) 88%, #2a244b)
+    );
+  box-shadow:
+    0 26px 70px color-mix(in srgb, var(--color-primary) 36%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.landing-btn-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: #fff;
+  font-weight: 600;
+  color: var(--color-text);
+  transition:
+    transform 300ms,
+    background 300ms;
+  box-shadow:
+    0 14px 34px rgba(20, 20, 44, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.landing-btn-light:hover {
+  transform: translateY(-1px);
+  background: #f8f8ff;
+}
+
+.landing-footer-link {
+  transition: color 200ms;
+  color: var(--color-muted);
+}
+
+.landing-footer-link:hover {
+  color: var(--color-text);
+}

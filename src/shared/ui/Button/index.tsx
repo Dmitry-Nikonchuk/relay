@@ -1,15 +1,64 @@
 'use client';
 
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import Link from 'next/link';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
-const buttonClasses =
-  'inline-flex items-center justify-center px-4 py-2 rounded-md border border-border bg-primary text-white font-medium transition-all duration-150 ease-out hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed';
+import { cn } from '@/shared/lib/cn';
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
+export type ButtonVariant = 'primary' | 'secondary' | 'light' | 'nav' | 'footer' | 'danger';
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ className, ...props }, ref) => {
-  const classNames = [buttonClasses, className].filter(Boolean).join(' ');
+const variantClass: Record<ButtonVariant, string> = {
+  primary: 'landing-btn-primary',
+  secondary: 'landing-btn-secondary',
+  light: 'landing-btn-light',
+  nav: 'landing-nav-link',
+  footer: 'landing-footer-link',
+  danger:
+    'inline-flex items-center justify-center rounded-xl border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-px hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-60',
+};
 
-  return <button ref={ref} className={classNames} {...props} />;
+const sizeClass = {
+  sm: 'px-4 py-2 text-sm',
+  md: 'px-5 py-3 text-sm',
+  lg: 'px-5 py-3 text-sm sm:px-6 sm:text-base',
+} as const;
+
+export type ButtonSize = keyof typeof sizeClass;
+
+export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'href'> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Renders `next/link` with the same surface styles as a button. */
+  href?: string;
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant = 'primary', size = 'md', href, children, disabled, ...rest },
+  ref,
+) {
+  const isTextVariant = variant === 'nav' || variant === 'footer';
+  const usesSizePadding = !isTextVariant && variant !== 'danger';
+  const classes = cn(variantClass[variant], usesSizePadding && sizeClass[size], className);
+
+  if (href !== undefined) {
+    return (
+      <Link href={href} className={classes}>
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      ref={ref}
+      className={cn(
+        classes,
+        'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60',
+      )}
+      disabled={disabled}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
 });
-Button.displayName = 'Button';
