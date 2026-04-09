@@ -13,8 +13,19 @@ import {
   ChatHistoryPageResponseDto,
   GenerateTitleResponseDto,
 } from '@/entities/chat';
+import type { UserChatModelsResponseDto } from '@/features/user/model/userChatModels.types';
 
 export const chatApi = {
+  async fetchUserChatModels(): Promise<UserChatModelsResponseDto> {
+    return httpClient.get<UserChatModelsResponseDto>('/api/user/chat-models');
+  },
+
+  async patchUserChatModel(model: string): Promise<UserChatModelsResponseDto> {
+    return httpClient.patch<UserChatModelsResponseDto>('/api/user/chat-models', {
+      body: JSON.stringify({ model }),
+    });
+  },
+
   async fetchChats(): Promise<Chat[]> {
     const rows = await httpClient.get<ChatListRow[]>('/api/chat');
     return rows.map(mapChatListRowToChat);
@@ -29,10 +40,14 @@ export const chatApi = {
     return mapChatCompleteResponseDtoToChatMessage(response);
   },
 
-  async streamMessages(chatId: string, onDelta: (chunk: string) => void): Promise<string> {
+  async streamMessages(
+    chatId: string,
+    onDelta: (chunk: string) => void,
+    opts?: { model?: string },
+  ): Promise<string> {
     const res = await httpClient.stream('/api/chat/stream', {
       method: 'POST',
-      body: JSON.stringify({ chatId }),
+      body: JSON.stringify({ chatId, model: opts?.model }),
     });
 
     const reader = res.body!.getReader();

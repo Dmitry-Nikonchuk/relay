@@ -41,6 +41,7 @@ export async function handleGenerateChatTitle(req: Request) {
       );
     }
 
+    console.error('[generateTitle]', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

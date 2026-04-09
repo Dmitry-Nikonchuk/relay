@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chat, ChatMessage } from '@/entities/chat';
+import type { UserChatModelsResponseDto } from '@/features/user/model/userChatModels.types';
 import { chatApi } from '../lib/chatApi';
 import {
   DEFAULT_CHAT_TITLE,
@@ -11,7 +12,12 @@ import {
   PLACEHOLDER_CHAT_TITLE,
   VIRTUOSO_FIRST_ITEM_INDEX,
 } from '../lib/constants';
-import { ChatForm } from './ChatForm';
+import {
+  type ChatSendFailureState,
+  getChatSendErrorMessage,
+  trimTrailingAssistant,
+} from '../lib/sendFailure';
+import { ChatForm, type ActiveChatModelInfo } from './ChatForm';
 import { MessagesStack } from './MessagesStack';
 import { ChatsList } from './ChatsList';
 import { ChatSidebarProfile, type ChatSidebarUser } from './ChatSidebarProfile';
@@ -41,7 +47,53 @@ export function ChatScreen({
   const [chatTitle, setChatTitle] = useState<string>(DEFAULT_CHAT_TITLE);
   const [isSendInProgress, setIsSendInProgress] = useState(false);
   const [messagesScrollEpoch, setMessagesScrollEpoch] = useState(0);
+  const [streamModelId, setStreamModelId] = useState<string | undefined>(undefined);
+  const [activeModelInfo, setActiveModelInfo] = useState<ActiveChatModelInfo | null>(null);
+  const [userChatModels, setUserChatModels] = useState<UserChatModelsResponseDto | null>(null);
+  const [isLoadingChatModel, setIsLoadingChatModel] = useState(true);
+  const [sendFailure, setSendFailure] = useState<ChatSendFailureState | null>(null);
   const prevChatIdRef = useRef<string | null | undefined>(undefined);
+
+  const applyChatModels = useCallback((d: UserChatModelsResponseDto) => {
+    const id = d.selectedModel ?? d.deploymentDefault;
+    const label = d.availableModels.find((m) => m.id === id)?.label ?? id;
+    setStreamModelId(id);
+    setActiveModelInfo({ id, label });
+    setUserChatModels(d);
+  }, []);
+
+  const handleChatModelChange = useCallback(
+    async (modelId: string) => {
+      const updated = await chatApi.patchUserChatModel(modelId);
+      applyChatModels(updated);
+    },
+    [applyChatModels],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingChatModel(true);
+    chatApi
+      .fetchUserChatModels()
+      .then((d) => {
+        if (!cancelled) applyChatModels(d);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingChatModel(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyChatModels]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      void chatApi.fetchUserChatModels().then(applyChatModels);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [applyChatModels]);
 
   useEffect(() => {
     setChats(initialChats);
@@ -62,6 +114,7 @@ export function ChatScreen({
     setMessages(initialMessages);
     setHasOlderMessages(initialMessagesHasMore);
     setFirstItemIndex(VIRTUOSO_FIRST_ITEM_INDEX);
+    setSendFailure(null);
   }, [chatIdFromUrl, initialMessages, initialMessagesHasMore, isSendInProgress]);
 
   useEffect(() => {
@@ -142,68 +195,153 @@ export function ChatScreen({
     [chatIdFromUrl, router],
   );
 
-  const sendMessage = async (inputText: string) => {
-    if (!inputText.trim()) {
-      return;
-    }
+  const runAssistantStream = async (
+    chatId: string,
+    userMessageForTitle: string,
+    runTitle: boolean,
+  ) => {
+    let accumulated = '';
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' } as ChatMessage]);
 
-    const trimmed = inputText.trim();
-    const newMessages = [...messages, { role: 'user', content: trimmed } as ChatMessage];
-    setMessages(newMessages);
-
-    const currentChatId = chatIdFromUrl;
-    const isFirstMessageNewChat = !currentChatId;
-
-    setIsSendInProgress(true);
-    try {
-      let accumulated = '';
-
-      const setupPromise = (async (): Promise<string | number> => {
-        if (!currentChatId) {
-          const chat = await chatApi.createChat({ title: PLACEHOLDER_CHAT_TITLE });
-          const newChatId = chat.id;
-          setChatTitle(chat.title);
-          router.replace(`/chat?chatId=${encodeURIComponent(newChatId)}`);
-          await chatApi.appendMessage(newChatId, 'user', trimmed);
-
-          return newChatId;
-        }
-
-        await chatApi.appendMessage(String(currentChatId), 'user', trimmed);
-        return currentChatId;
-      })();
-
-      const chatIdForAssistant = await setupPromise;
-
-      const fullText = await chatApi.streamMessages(String(chatIdForAssistant), (chunk) => {
+    const fullText = await chatApi.streamMessages(
+      String(chatId),
+      (chunk) => {
         accumulated += chunk;
-
         setMessages((prev) => {
           const next = [...prev];
           const last = next[next.length - 1];
-
           if (last && last.role === 'assistant') {
             next[next.length - 1] = { ...last, content: accumulated };
           } else {
             next.push({ role: 'assistant', content: accumulated } as ChatMessage);
           }
-
           return next;
         });
-      });
+      },
+      { model: streamModelId },
+    );
 
-      await chatApi.appendMessage(String(chatIdForAssistant), 'assistant', fullText);
-      router.refresh();
+    await chatApi.appendMessage(String(chatId), 'assistant', fullText);
+    router.refresh();
 
-      if (isFirstMessageNewChat) {
-        const title = await chatApi.generateChatTitle(trimmed, fullText);
-        await chatApi.updateChatTitle(String(chatIdForAssistant), title);
+    if (runTitle) {
+      try {
+        const title = await chatApi.generateChatTitle(userMessageForTitle, fullText);
+        await chatApi.updateChatTitle(String(chatId), title);
         setChatTitle(title);
         router.refresh();
+      } catch {
+        // Title is optional
       }
+    }
+  };
+
+  /** @returns whether send + stream completed successfully */
+  const sendMessage = async (
+    inputText: string,
+    options?: { skipUserBubble?: boolean },
+  ): Promise<boolean> => {
+    const trimmed = inputText.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    const skipUserBubble = options?.skipUserBubble ?? false;
+    if (!skipUserBubble) {
+      setMessages((prev) => [...prev, { role: 'user', content: trimmed } as ChatMessage]);
+    }
+
+    setSendFailure(null);
+
+    const currentChatId = chatIdFromUrl;
+    const isFirstMessageNewChat = !currentChatId;
+
+    let effectiveChatId: string | null = currentChatId ? String(currentChatId) : null;
+    let userRecordedInDb = false;
+
+    setIsSendInProgress(true);
+    try {
+      if (!currentChatId) {
+        const chat = await chatApi.createChat({ title: PLACEHOLDER_CHAT_TITLE });
+        effectiveChatId = chat.id;
+        setChatTitle(chat.title);
+        router.replace(`/chat?chatId=${encodeURIComponent(effectiveChatId)}`);
+        await chatApi.appendMessage(effectiveChatId, 'user', trimmed);
+        userRecordedInDb = true;
+      } else {
+        await chatApi.appendMessage(String(currentChatId), 'user', trimmed);
+        userRecordedInDb = true;
+        effectiveChatId = String(currentChatId);
+      }
+
+      if (!effectiveChatId) {
+        throw new Error('Chat could not be created');
+      }
+
+      await runAssistantStream(effectiveChatId, trimmed, isFirstMessageNewChat);
+      return true;
+    } catch (e) {
+      setMessages((prev) => trimTrailingAssistant(prev));
+      setSendFailure({
+        userText: trimmed,
+        error: getChatSendErrorMessage(e),
+        userPersisted: userRecordedInDb,
+        chatId: effectiveChatId,
+        generateTitleAfterStream: isFirstMessageNewChat,
+      });
+      return false;
     } finally {
       setIsSendInProgress(false);
     }
+  };
+
+  const retryFailedSend = async () => {
+    if (!sendFailure) {
+      return;
+    }
+    const { userText, userPersisted, chatId, generateTitleAfterStream = false } = sendFailure;
+
+    setSendFailure(null);
+    setIsSendInProgress(true);
+
+    let recorded = userPersisted;
+    const cid = chatId;
+
+    try {
+      if (userPersisted && chatId) {
+        await runAssistantStream(chatId, userText, generateTitleAfterStream);
+        return;
+      }
+
+      if (chatId && !userPersisted) {
+        await chatApi.appendMessage(chatId, 'user', userText);
+        recorded = true;
+        await runAssistantStream(chatId, userText, generateTitleAfterStream);
+        return;
+      }
+
+      const ok = await sendMessage(userText, { skipUserBubble: true });
+      if (!ok) {
+        return;
+      }
+    } catch (e) {
+      setMessages((prev) => trimTrailingAssistant(prev));
+      setSendFailure({
+        userText,
+        error: getChatSendErrorMessage(e),
+        userPersisted: recorded,
+        chatId: cid,
+        generateTitleAfterStream,
+      });
+    } finally {
+      setIsSendInProgress(false);
+    }
+  };
+
+  const isEmptyThread = messages.length === 0 && !isSendInProgress;
+
+  const handleFormSubmit = async (text: string) => {
+    await sendMessage(text);
   };
 
   return (
@@ -239,19 +377,48 @@ export function ChatScreen({
               <h1 className="m-0 text-xl font-semibold tracking-tight">{chatTitle}</h1>
             </div>
           </header>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <MessagesStack
-              messages={messages}
-              isAssistantLoading={isSendInProgress}
-              messagesScrollEpoch={messagesScrollEpoch}
-              firstItemIndex={firstItemIndex}
-              onLoadOlder={chatIdFromUrl ? loadOlderMessages : undefined}
-              hasOlder={hasOlderMessages}
-              isLoadingOlder={isLoadingOlderMessages}
-            />
-          </div>
+          {isEmptyThread ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-3 pb-6 pt-2 sm:px-5">
+              <div className="w-full max-w-[560px]">
+                <ChatForm
+                  variant="empty"
+                  onSubmit={handleFormSubmit}
+                  disabled={isSendInProgress}
+                  isSubmitting={isSendInProgress}
+                  activeModel={activeModelInfo}
+                  isLoadingModel={isLoadingChatModel}
+                  availableModels={userChatModels?.availableModels ?? []}
+                  onModelChange={handleChatModelChange}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <MessagesStack
+                  messages={messages}
+                  isAssistantLoading={isSendInProgress}
+                  messagesScrollEpoch={messagesScrollEpoch}
+                  firstItemIndex={firstItemIndex}
+                  onLoadOlder={chatIdFromUrl ? loadOlderMessages : undefined}
+                  hasOlder={hasOlderMessages}
+                  isLoadingOlder={isLoadingOlderMessages}
+                  sendFailure={sendFailure}
+                  onRetrySend={retryFailedSend}
+                />
+              </div>
 
-          <ChatForm onSubmit={sendMessage} disabled={isSendInProgress} />
+              <ChatForm
+                onSubmit={handleFormSubmit}
+                disabled={isSendInProgress}
+                isSubmitting={isSendInProgress}
+                activeModel={activeModelInfo}
+                isLoadingModel={isLoadingChatModel}
+                availableModels={userChatModels?.availableModels ?? []}
+                onModelChange={handleChatModelChange}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
