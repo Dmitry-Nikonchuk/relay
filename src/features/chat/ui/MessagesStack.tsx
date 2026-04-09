@@ -5,7 +5,9 @@ import { Virtuoso, type ListProps, type VirtuosoHandle } from 'react-virtuoso';
 import { ChatMessage } from '@/entities/chat';
 import { cn } from '@/shared/lib/cn';
 
+import type { ChatSendFailureState } from '../lib/sendFailure';
 import { AssistantReplyLoader } from './AssistantReplyLoader';
+import { ChatSendError } from './ChatSendError';
 import { markdownComponents, markdownRemarkPlugins } from './messageMarkdown';
 import ReactMarkdown from 'react-markdown';
 
@@ -29,6 +31,8 @@ export function MessagesStack({
   onLoadOlder,
   hasOlder = false,
   isLoadingOlder = false,
+  sendFailure,
+  onRetrySend,
 }: {
   messages: ChatMessage[];
   isAssistantLoading?: boolean;
@@ -39,6 +43,8 @@ export function MessagesStack({
   onLoadOlder?: () => void | Promise<void>;
   hasOlder?: boolean;
   isLoadingOlder?: boolean;
+  sendFailure?: ChatSendFailureState | null;
+  onRetrySend?: () => void | Promise<void>;
 }) {
   const last = messages[messages.length - 1];
 
@@ -121,6 +127,13 @@ export function MessagesStack({
         ) : null,
       Footer: () => (
         <div className="px-5">
+          {sendFailure ? (
+            <ChatSendError
+              message={sendFailure.error}
+              onResend={() => void onRetrySend?.()}
+              disabled={isAssistantLoading}
+            />
+          ) : null}
           {isAssistantLoading ? (
             <div className="flex scroll-mt-5 flex-col overflow-hidden rounded-lg border border-border/80 bg-white/95 shadow-sm">
               {showThinkingLoader ? (
@@ -147,7 +160,14 @@ export function MessagesStack({
         </div>
       ),
     }),
-    [assistantStreamText, isAssistantLoading, isLoadingOlder, showThinkingLoader],
+    [
+      assistantStreamText,
+      isAssistantLoading,
+      isLoadingOlder,
+      showThinkingLoader,
+      sendFailure,
+      onRetrySend,
+    ],
   );
 
   return (

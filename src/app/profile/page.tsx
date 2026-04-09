@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { SignOutButton } from '@/features/auth/ui/SignOutButton';
+import { ProfileChatModelSection } from '@/features/user/ui/ProfileChatModelSection';
 import { auth } from '@/auth';
 import { Button } from '@/shared/ui/Button';
 import { UserAvatar } from '@/shared/ui/UserAvatar';
@@ -46,6 +47,8 @@ export default async function ProfilePage() {
               ) : null}
             </div>
           </div>
+
+          <ProfileChatModelSection />
 
           <div className="border-t border-border pt-6 text-sm leading-relaxed text-muted">
             <p>

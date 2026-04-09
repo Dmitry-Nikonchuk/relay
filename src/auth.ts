@@ -41,7 +41,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         const isProtectedAppRoute =
           pathname.startsWith('/chat') ||
           pathname.startsWith('/profile') ||
-          pathname.startsWith('/api/chat');
+          pathname.startsWith('/api/chat') ||
+          pathname.startsWith('/api/user');
 
         if (isProtectedAppRoute) {
           if (!isAuthed) {

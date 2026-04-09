@@ -3,6 +3,7 @@ import { ZodError, treeifyError } from 'zod';
 import { ChatCompleteRequestDtoSchema } from '@/entities/chat';
 import { chatService } from '@/shared/lib/ai/chat.service';
 import { buildChatContext } from '@/features/chat/server/chatMemory';
+import { resolveEffectiveChatModel } from '@/features/user/server/chatModels.service';
 
 export async function handleStream(req: Request, userId: string) {
   try {
@@ -19,9 +20,14 @@ export async function handleStream(req: Request, userId: string) {
       return Response.json({ error: 'No messages to stream' }, { status: 400 });
     }
 
+    const resolved = await resolveEffectiveChatModel(userId, dto.model);
+    if ('error' in resolved) {
+      return Response.json({ error: resolved.error }, { status: resolved.status });
+    }
+
     const stream = await chatService.stream({
       messages,
-      model: dto.model,
+      model: resolved.model,
       temperature: dto.temperature,
       maxTokens: dto.maxTokens,
       stream: true,
