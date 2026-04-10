@@ -23,6 +23,19 @@
   "observability": {
     "enabled": true,
   },
+  "env": {
+    "production": {
+      "vars": {
+        "AUTH_GOOGLE_ID": "@AUTH_GOOGLE_ID",
+        "AUTH_GOOGLE_SECRET": "@AUTH_GOOGLE_SECRET",
+        "AUTH_SECRET": "@AUTH_SECRET",
+        "OPENROUTER_API_KEY": "@OPENROUTER_API_KEY",
+        "OPENROUTER_BASE_URL": "@OPENROUTER_BASE_URL",
+        "OPENROUTER_MODEL": "@OPENROUTER_MODEL",
+        "OPENROUTER_SUMMARY_MODEL": "@OPENROUTER_SUMMARY_MODEL",
+      },
+    },
+  },
   "d1_databases": [
     {
       "binding": "DB",
