@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { SignOutButton } from '@/features/auth/ui/SignOutButton';
-import { ProfileChatModelSection } from '@/features/user/ui/ProfileChatModelSection';
+import { ProfilePlanUsageSection } from '@/features/user/ui/ProfilePlanUsageSection';
+import { getUserPlanAndUsageSummary } from '@/features/user/server/chatModels.service';
 import { auth } from '@/auth';
 import { Button } from '@/shared/ui/Button';
 import { UserAvatar } from '@/shared/ui/UserAvatar';
@@ -21,10 +22,11 @@ export default async function ProfilePage() {
 
   const { name, email, image } = session.user;
   const displayName = name?.trim() || 'Account';
+  const planData = await getUserPlanAndUsageSummary(session.user.id);
 
   return (
     <main className="landing-bg min-h-screen px-5 py-10 md:px-8">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-[1120px]">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-text">Profile</h1>
           <div className="flex flex-wrap items-center gap-2">
@@ -48,7 +50,7 @@ export default async function ProfilePage() {
             </div>
           </div>
 
-          <ProfileChatModelSection />
+          {planData ? <ProfilePlanUsageSection data={planData} /> : null}
 
           <div className="border-t border-border pt-6 text-sm leading-relaxed text-muted">
             <p>

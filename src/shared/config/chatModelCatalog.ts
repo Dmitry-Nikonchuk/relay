@@ -9,6 +9,28 @@ export type ChatModelDefinition = {
   minTier?: 'free' | 'pro';
 };
 
+export type ChatSubscriptionTier = 'free' | 'pro';
+
+export type GuardrailOperationPolicyDefinition = {
+  maxPromptChars: number;
+  maxPromptMessages: number;
+  maxRequestedTokens: number;
+  defaultReservedCompletionTokens: number;
+  rateLimitWindowSeconds: number;
+  rateLimitMaxRequests: number;
+};
+
+export type GuardrailTierPolicyDefinition = {
+  maxUserMessageChars: number;
+  dailyUserVisibleTokens: number;
+  dailySystemTokens: number;
+  operations: {
+    chat: GuardrailOperationPolicyDefinition;
+    title: GuardrailOperationPolicyDefinition;
+    summary: GuardrailOperationPolicyDefinition;
+  };
+};
+
 const FALLBACK_DEPLOYMENT_MODEL = 'liquid/lfm-2.5-1.2b-thinking:free';
 
 export const CHAT_MODEL_CATALOG: ChatModelDefinition[] = [
@@ -39,8 +61,82 @@ export const CHAT_MODEL_CATALOG: ChatModelDefinition[] = [
   },
 ];
 
+const FREE_GUARDRAIL_POLICY: GuardrailTierPolicyDefinition = {
+  maxUserMessageChars: 8_000,
+  dailyUserVisibleTokens: 100_000,
+  dailySystemTokens: 12_000,
+  operations: {
+    chat: {
+      maxPromptChars: 24_000,
+      maxPromptMessages: 48,
+      maxRequestedTokens: 4_096,
+      defaultReservedCompletionTokens: 2_048,
+      rateLimitWindowSeconds: 60,
+      rateLimitMaxRequests: 10,
+    },
+    title: {
+      maxPromptChars: 6_000,
+      maxPromptMessages: 4,
+      maxRequestedTokens: 64,
+      defaultReservedCompletionTokens: 24,
+      rateLimitWindowSeconds: 300,
+      rateLimitMaxRequests: 20,
+    },
+    summary: {
+      maxPromptChars: 18_000,
+      maxPromptMessages: 24,
+      maxRequestedTokens: 1_000,
+      defaultReservedCompletionTokens: 600,
+      rateLimitWindowSeconds: 300,
+      rateLimitMaxRequests: 8,
+    },
+  },
+};
+
+const PRO_GUARDRAIL_POLICY: GuardrailTierPolicyDefinition = {
+  maxUserMessageChars: 20_000,
+  dailyUserVisibleTokens: 500_000,
+  dailySystemTokens: 40_000,
+  operations: {
+    chat: {
+      maxPromptChars: 60_000,
+      maxPromptMessages: 80,
+      maxRequestedTokens: 8_192,
+      defaultReservedCompletionTokens: 4_096,
+      rateLimitWindowSeconds: 60,
+      rateLimitMaxRequests: 30,
+    },
+    title: {
+      maxPromptChars: 8_000,
+      maxPromptMessages: 4,
+      maxRequestedTokens: 64,
+      defaultReservedCompletionTokens: 24,
+      rateLimitWindowSeconds: 300,
+      rateLimitMaxRequests: 40,
+    },
+    summary: {
+      maxPromptChars: 30_000,
+      maxPromptMessages: 32,
+      maxRequestedTokens: 1_500,
+      defaultReservedCompletionTokens: 800,
+      rateLimitWindowSeconds: 300,
+      rateLimitMaxRequests: 20,
+    },
+  },
+};
+
 export function getDeploymentDefaultModelId(): string {
   return process.env.OPENROUTER_MODEL?.trim() || FALLBACK_DEPLOYMENT_MODEL;
+}
+
+export function normalizeSubscriptionTier(tier: string | undefined | null): ChatSubscriptionTier {
+  return tier === 'pro' ? 'pro' : 'free';
+}
+
+export function getGuardrailTierPolicy(
+  tier: string | undefined | null,
+): GuardrailTierPolicyDefinition {
+  return normalizeSubscriptionTier(tier) === 'pro' ? PRO_GUARDRAIL_POLICY : FREE_GUARDRAIL_POLICY;
 }
 
 /** Include deployment default in the list if missing (custom OPENROUTER_MODEL). */

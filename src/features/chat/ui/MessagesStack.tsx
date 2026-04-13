@@ -132,6 +132,7 @@ export function MessagesStack({
               message={sendFailure.error}
               onResend={() => void onRetrySend?.()}
               disabled={isAssistantLoading}
+              canRetry={sendFailure.canRetry}
             />
           ) : null}
           {isAssistantLoading ? (

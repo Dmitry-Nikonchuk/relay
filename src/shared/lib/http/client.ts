@@ -1,3 +1,51 @@
+import type { ApiErrorResponseDto } from '@/shared/lib/api/errors';
+
+export class HttpError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly resetAt?: string;
+  readonly retryAfterSeconds?: number;
+  readonly details?: unknown;
+
+  constructor(
+    message: string,
+    init: {
+      status: number;
+      code?: string;
+      resetAt?: string;
+      retryAfterSeconds?: number;
+      details?: unknown;
+    },
+  ) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = init.status;
+    this.code = init.code;
+    this.resetAt = init.resetAt;
+    this.retryAfterSeconds = init.retryAfterSeconds;
+    this.details = init.details;
+  }
+}
+
+async function throwIfNotOk(response: Response): Promise<void> {
+  if (response.ok) {
+    return;
+  }
+
+  const body = await response
+    .json()
+    .then((payload) => payload as ApiErrorResponseDto)
+    .catch(() => null);
+
+  throw new HttpError(body?.message || body?.error || `HTTP error! status: ${response.status}`, {
+    status: response.status,
+    code: body?.code,
+    resetAt: body?.resetAt,
+    retryAfterSeconds: body?.retryAfterSeconds,
+    details: body?.details,
+  });
+}
+
 export const httpClient = {
   async get<T>(input: RequestInfo | URL, options?: RequestInit): Promise<T> {
     const response = await fetch(input, {
@@ -8,9 +56,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
     return response.json() as T;
   },
 
@@ -23,9 +69,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
     return response.json() as T;
   },
 
@@ -38,9 +82,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
     return response.json() as T;
   },
 
@@ -53,9 +95,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
     return response.json() as T;
   },
 
@@ -68,9 +108,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
     return response.json() as T;
   },
 
@@ -82,10 +120,7 @@ export const httpClient = {
         ...options?.headers,
       },
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await throwIfNotOk(response);
 
     return response;
   },

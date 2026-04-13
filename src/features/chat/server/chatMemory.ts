@@ -20,6 +20,12 @@ import { AiProviderError } from '@/shared/lib/ai/errors';
 import { getMessageContent } from '@/shared/lib/ai/messageContent';
 import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
 import { buildChatMemorySummaryPrompt } from './prompts/chatMemorySummaryPrompt';
+import { getUserGuardrailContext } from '@/features/user/server/chatModels.service';
+import {
+  checkGuardrails,
+  estimateTokensFromMessages,
+  recordGuardrailUsage,
+} from '@/shared/lib/guardrails/service';
 
 const BASE_CHAT_SYSTEM_PROMPT = [
   'You are Relay, a helpful assistant.',
@@ -230,20 +236,50 @@ async function listUnsummarizedMessages(
 }
 
 async function summarizeDeltaChunk(
+  userId: string,
+  tier: 'free' | 'pro',
   previousSummary: ChatMemoryJson,
   deltaMessages: ChatMessage[],
 ): Promise<ChatMemoryJson> {
+  const prompt = buildChatMemorySummaryPrompt(previousSummary, deltaMessages);
+  const estimatedPromptTokens = estimateTokensFromMessages(prompt);
+  const promptCharCount = prompt.reduce((sum, message) => sum + message.content.length, 0);
+  const guardrail = await checkGuardrails({
+    userId,
+    tier,
+    operation: 'summary',
+    model: AI.summaryModel,
+    estimatedPromptTokens,
+    promptCharCount,
+    promptMessageCount: prompt.length,
+    requestedMaxTokens: 1000,
+  });
+
+  if (!guardrail.allowed) {
+    throw new AiProviderError(guardrail.denial.message, guardrail.denial.status, 'guardrails');
+  }
+
   const response = await chatService.complete({
     model: AI.summaryModel,
     temperature: 0,
     maxTokens: 1000,
-    messages: buildChatMemorySummaryPrompt(previousSummary, deltaMessages),
+    messages: prompt,
   });
 
   const content = getMessageContent(response.choices?.[0]?.message);
   if (!content || content.trim().length < 2) {
     throw new Error('Summary model returned empty payload');
   }
+
+  await recordGuardrailUsage({
+    userId,
+    tier,
+    operation: 'summary',
+    model: AI.summaryModel,
+    promptTokens: response.usage?.prompt_tokens ?? estimatedPromptTokens,
+    completionTokens: response.usage?.completion_tokens ?? estimateTokens(content),
+    outcome: 'success',
+  });
 
   const parsed = JSON.parse(extractJsonCandidate(content));
   return ChatMemoryJsonSchema.parse(parsed);
@@ -300,6 +336,11 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
     return;
   }
 
+  const guardrailContext = await getUserGuardrailContext(userId);
+  if (!guardrailContext) {
+    return;
+  }
+
   const memory = await getMemoryFromBackfill(chatId);
   const unsummarized = await listUnsummarizedMessages(
     chatId,
@@ -339,7 +380,12 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
   try {
     for (const chunk of chunks) {
       const chunkMessagesForPrompt = chunk.map(rowToChatMessage);
-      workingSummary = await summarizeDeltaChunk(workingSummary, chunkMessagesForPrompt);
+      workingSummary = await summarizeDeltaChunk(
+        userId,
+        guardrailContext.tier,
+        workingSummary,
+        chunkMessagesForPrompt,
+      );
     }
 
     const lastProcessed = unsummarized[unsummarized.length - 1];
@@ -369,6 +415,14 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
     });
   } catch (error) {
     if (error instanceof AiProviderError && error.status != null) {
+      if (error.provider === 'guardrails') {
+        console.info('[chat-memory] summary update skipped by guardrails', {
+          chatId,
+          status: error.status,
+        });
+        return;
+      }
+
       const isTransient = [429, 502, 503].includes(error.status);
       console.warn('[chat-memory] summary update failed', {
         chatId,
