@@ -14,6 +14,7 @@ import {
 } from '../lib/constants';
 import {
   type ChatSendFailureState,
+  canRetrySendError,
   getChatSendErrorMessage,
   trimTrailingAssistant,
 } from '../lib/sendFailure';
@@ -285,6 +286,7 @@ export function ChatScreen({
       setSendFailure({
         userText: trimmed,
         error: getChatSendErrorMessage(e),
+        canRetry: canRetrySendError(e),
         userPersisted: userRecordedInDb,
         chatId: effectiveChatId,
         generateTitleAfterStream: isFirstMessageNewChat,
@@ -329,6 +331,7 @@ export function ChatScreen({
       setSendFailure({
         userText,
         error: getChatSendErrorMessage(e),
+        canRetry: canRetrySendError(e),
         userPersisted: recorded,
         chatId: cid,
         generateTitleAfterStream,

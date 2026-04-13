@@ -1,12 +1,57 @@
 import { ChatMessage, GenerateTitleRequestDtoSchema } from '@/entities/chat';
-import { getMessageContent } from '@/shared/lib/ai/messageContent';
 import { chatService } from '@/shared/lib/ai/chat.service';
+import {
+  ApiError,
+  apiErrorResponse,
+  internalServerErrorResponse,
+  invalidPayloadResponse,
+} from '@/shared/lib/api/errors';
+import { AI } from '@/shared/lib/ai/config';
+import { getUserGuardrailContext } from '@/features/user/server/chatModels.service';
+import {
+  checkGuardrails,
+  estimateTokensFromMessages,
+  estimateTokensFromText,
+  recordGuardrailUsage,
+  toGuardrailApiError,
+} from '@/shared/lib/guardrails/service';
 import { treeifyError, ZodError } from 'zod';
+import type { AiAssistantMessage } from '@/shared/lib/ai/types';
 
-export async function handleGenerateChatTitle(req: Request) {
+function getTitleText(message: AiAssistantMessage | null | undefined): string {
+  if (!message) {
+    return '';
+  }
+
+  const content = message.content;
+  if (typeof content !== 'string') {
+    return '';
+  }
+
+  return content.trim();
+}
+
+function normalizeGeneratedTitle(raw: string): string {
+  const singleLine = raw.replace(/\s+/g, ' ').trim();
+  const withoutWrappingQuotes = singleLine.replace(/^["'“”«»]+|["'“”«»]+$/g, '').trim();
+
+  return withoutWrappingQuotes;
+}
+
+export async function handleGenerateChatTitle(req: Request, userId: string) {
   try {
     const body = await req.json();
     const dto = GenerateTitleRequestDtoSchema.parse(body);
+    const context = await getUserGuardrailContext(userId);
+    if (!context) {
+      return apiErrorResponse(
+        new ApiError('User not found', {
+          status: 404,
+          code: 'USER_NOT_FOUND',
+          message: 'User not found',
+        }),
+      );
+    }
 
     const messages: ChatMessage[] = [
       {
@@ -26,22 +71,50 @@ export async function handleGenerateChatTitle(req: Request) {
       },
     ];
 
+    const promptCharCount = messages.reduce((sum, message) => sum + message.content.length, 0);
+    const estimatedPromptTokens = estimateTokensFromMessages(messages);
+    const guardrail = await checkGuardrails({
+      userId,
+      tier: context.tier,
+      operation: 'title',
+      model: AI.model,
+      estimatedPromptTokens,
+      promptCharCount,
+      promptMessageCount: messages.length,
+      requestedMaxTokens: 24,
+    });
+    if (!guardrail.allowed) {
+      return apiErrorResponse(toGuardrailApiError(guardrail.denial));
+    }
+
     const response = await chatService.complete({
       messages,
-      model: process.env.OPENROUTER_MODEL ?? 'liquid/lfm-2.5-1.2b-thinking:free',
+      model: AI.model,
+      temperature: 0,
+      maxTokens: 24,
     });
 
-    const content = getMessageContent(response.choices?.[0]?.message);
+    const content = normalizeGeneratedTitle(getTitleText(response.choices?.[0]?.message));
+    if (!content) {
+      throw new Error('Title model returned empty content');
+    }
+
+    await recordGuardrailUsage({
+      userId,
+      tier: context.tier,
+      operation: 'title',
+      model: AI.model,
+      promptTokens: response.usage?.prompt_tokens ?? estimatedPromptTokens,
+      completionTokens: response.usage?.completion_tokens ?? estimateTokensFromText(content),
+      outcome: 'success',
+    });
     return Response.json({ chatTitle: content });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: 'Invalid payload', details: treeifyError(error) },
-        { status: 400 },
-      );
+      return invalidPayloadResponse(treeifyError(error));
     }
 
     console.error('[generateTitle]', error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    return internalServerErrorResponse();
   }
 }
