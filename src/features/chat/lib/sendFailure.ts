@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@/entities/chat';
+import type { ChatFailedReply } from '@/entities/chat';
 import { HttpError } from '@/shared/lib/http/client';
 
 export type ChatSendFailureState = {
@@ -9,9 +10,25 @@ export type ChatSendFailureState = {
   userPersisted: boolean;
   /** Chat id for stream/append; null if setup did not complete. */
   chatId: string | null;
+  userMessageId?: string | null;
   /** First message in a new chat — generate title after a successful stream retry. */
   generateTitleAfterStream?: boolean;
 };
+
+export function toFailedReplyState(input: {
+  userMessageId: string;
+  userText: string;
+  error: string;
+  canRetry: boolean;
+}): ChatFailedReply {
+  return {
+    userMessageId: input.userMessageId,
+    userText: input.userText,
+    errorMessage: input.error,
+    canRetry: input.canRetry,
+    failedAt: new Date().toISOString(),
+  };
+}
 
 export function trimTrailingAssistant(messages: ChatMessage[]): ChatMessage[] {
   if (messages.length === 0) return messages;

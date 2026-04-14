@@ -7,9 +7,16 @@ type Props = {
   onResend: () => void;
   disabled?: boolean;
   canRetry?: boolean;
+  actionLabel?: string;
 };
 
-export function ChatSendError({ message, onResend, disabled = false, canRetry = true }: Props) {
+export function ChatSendError({
+  message,
+  onResend,
+  disabled = false,
+  canRetry = true,
+  actionLabel = 'Resend message',
+}: Props) {
   return (
     <div
       className="mb-4 rounded-lg border border-red-200/90 bg-red-50/95 px-4 py-3 text-sm text-red-950 shadow-sm"
@@ -25,7 +32,7 @@ export function ChatSendError({ message, onResend, disabled = false, canRetry = 
             disabled={disabled}
             onClick={onResend}
           >
-            Resend message
+            {actionLabel}
           </Button>
         </div>
       ) : null}

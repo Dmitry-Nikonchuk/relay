@@ -1,10 +1,18 @@
 import { ZodError, treeifyError } from 'zod';
 
+import {
+  ApiError,
+  apiErrorResponse,
+  internalServerErrorResponse,
+  invalidPayloadResponse,
+} from '@/shared/lib/api/errors';
 import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
 import { ChatAppendMessageRequestDtoSchema } from '@/entities/chat';
 import type { ChatMessage } from '@/entities/chat';
 import { MESSAGE_PAGE_DEFAULT_LIMIT, MESSAGE_PAGE_MAX_LIMIT } from '@/features/chat/lib/constants';
 import { estimateMessageTokenCount, maybeUpdateChatMemory } from './chatMemory';
+import { getLatestFailedReplyForChat, resolvePendingReply } from './pendingReplies';
+import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 
 async function assertChatOwnedByUser(chatId: string, userId: string): Promise<boolean> {
   const row = await queryOne<{ id: string }>('SELECT id FROM chats WHERE id = ? AND user_id = ?', [
@@ -45,6 +53,13 @@ export type MessagePageCursor = {
 export type ListMessagesPageResult = {
   messages: ChatMessage[];
   hasMore: boolean;
+  failedReply: {
+    userMessageId: string;
+    userText: string;
+    errorMessage: string;
+    canRetry: boolean;
+    failedAt: string;
+  } | null;
 };
 
 /**
@@ -62,13 +77,16 @@ export async function listMessagesLatestPage(
   }
 
   const lim = clampLimit(limit);
-  const rows = await queryAll<MessageRow>(
-    `SELECT id, role, content, created_at FROM messages
-     WHERE chat_id = ?
-     ORDER BY created_at DESC, id DESC
-     LIMIT ?`,
-    [chatId, lim + 1],
-  );
+  const [rows, failedReply] = await Promise.all([
+    queryAll<MessageRow>(
+      `SELECT id, role, content, created_at FROM messages
+       WHERE chat_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`,
+      [chatId, lim + 1],
+    ),
+    getLatestFailedReplyForChat(chatId, userId),
+  ]);
 
   const hasMore = rows.length > lim;
   const slice = hasMore ? rows.slice(0, lim) : rows;
@@ -77,6 +95,7 @@ export async function listMessagesLatestPage(
   return {
     messages: asc.map(rowToChatMessage),
     hasMore,
+    failedReply,
   };
 }
 
@@ -111,7 +130,70 @@ export async function listMessagesPageBefore(
   return {
     messages: asc.map(rowToChatMessage),
     hasMore,
+    failedReply: null,
   };
+}
+
+export async function getUserMessageForChat(
+  chatId: string,
+  userMessageId: string,
+  userId: string,
+): Promise<{ id: string; content: string } | null> {
+  const owned = await assertChatOwnedByUser(chatId, userId);
+  if (!owned) {
+    return null;
+  }
+
+  return queryOne<{ id: string; content: string }>(
+    `SELECT id, content
+     FROM messages
+     WHERE id = ? AND chat_id = ? AND role = 'user'`,
+    [userMessageId, chatId],
+  );
+}
+
+export async function persistChatMessage(params: {
+  chatId: string;
+  userId: string;
+  role: ChatMessage['role'];
+  content: string;
+  resolvePendingForUserMessageId?: string;
+}): Promise<{ id: string; createdAt: string }> {
+  const owned = await assertChatOwnedByUser(params.chatId, params.userId);
+  if (!owned) {
+    throw new ApiError('Chat not found', {
+      status: 404,
+      code: 'CHAT_NOT_FOUND',
+      message: 'Chat not found',
+    });
+  }
+
+  const messageId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const tokenCount = estimateMessageTokenCount(params.content);
+
+  await execute(
+    `INSERT INTO messages
+      (id, chat_id, role, content, created_at, token_count, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [messageId, params.chatId, params.role, params.content, now, tokenCount, null],
+  );
+  await execute('UPDATE chats SET updated_at = ? WHERE id = ?', [now, params.chatId]);
+
+  if (params.resolvePendingForUserMessageId) {
+    await resolvePendingReply(params.resolvePendingForUserMessageId);
+  }
+
+  if (params.role === 'assistant') {
+    void maybeUpdateChatMemory(params.chatId, params.userId).catch((error) => {
+      console.warn('[chat-memory] async update failed', {
+        chatId: params.chatId,
+        error: error instanceof Error ? error.message : 'unknown-error',
+      });
+    });
+  }
+
+  return { id: messageId, createdAt: now };
 }
 
 /** Full message history for the main chat model (stream by `chatId`). */
@@ -170,6 +252,7 @@ export async function handleGetMessages(req: Request, userId: string) {
       return Response.json({
         messages: page.messages,
         hasMore: page.hasMore,
+        failedReply: null,
       });
     }
 
@@ -181,10 +264,11 @@ export async function handleGetMessages(req: Request, userId: string) {
     return Response.json({
       messages: page.messages,
       hasMore: page.hasMore,
+      failedReply: page.failedReply,
     });
   } catch (error) {
     console.error(error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    return internalServerErrorResponse();
   }
 }
 
@@ -192,43 +276,51 @@ export async function handleAppendMessage(req: Request, userId: string) {
   try {
     const body = await req.json();
     const dto = ChatAppendMessageRequestDtoSchema.parse(body);
+    const requestId = dto.requestId ?? createRequestId();
+    const persisted = await persistChatMessage({
+      chatId: dto.chatId,
+      userId,
+      role: dto.role,
+      content: dto.content,
+    });
 
-    const owned = await assertChatOwnedByUser(dto.chatId, userId);
-    if (!owned) {
-      return Response.json({ error: 'Not found' }, { status: 404 });
-    }
-
-    const messageId = crypto.randomUUID();
-    const now = new Date().toISOString();
-    const tokenCount = estimateMessageTokenCount(dto.content);
-
-    await execute(
-      `INSERT INTO messages
-        (id, chat_id, role, content, created_at, token_count, metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [messageId, dto.chatId, dto.role, dto.content, now, tokenCount, null],
+    logChatEvent(
+      'info',
+      {
+        request_id: requestId,
+        user_id: userId,
+        chat_id: dto.chatId,
+        user_message_id: dto.role === 'user' ? persisted.id : null,
+      },
+      {
+        stage: 'user_message_persist',
+        event: dto.role === 'user' ? 'user_message_persisted' : 'message_persisted',
+        role: dto.role,
+      },
     );
-    await execute('UPDATE chats SET updated_at = ? WHERE id = ?', [now, dto.chatId]);
 
-    if (dto.role === 'assistant') {
-      void maybeUpdateChatMemory(dto.chatId, userId).catch((error) => {
-        console.warn('[chat-memory] async update failed', {
-          chatId: dto.chatId,
-          error: error instanceof Error ? error.message : 'unknown-error',
-        });
-      });
-    }
-
-    return Response.json({ id: messageId });
+    return Response.json({ id: persisted.id });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: 'Invalid payload', details: treeifyError(error) },
-        { status: 400 },
-      );
+      return invalidPayloadResponse(treeifyError(error));
     }
 
-    console.error(error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    if (error instanceof ApiError) {
+      return apiErrorResponse(error);
+    }
+
+    logChatEvent(
+      'error',
+      {
+        request_id: createRequestId(),
+        user_id: userId,
+      },
+      {
+        stage: 'user_message_persist',
+        event: 'message_persist_failed',
+        error: serializeError(error),
+      },
+    );
+    return internalServerErrorResponse();
   }
 }

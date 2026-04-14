@@ -29,10 +29,11 @@ export const mapChatCompleteResponseDtoToChatMessage = (
 };
 
 export const mapChatToCreateRequestDto = (
-  chat: Omit<Chat, 'id' | 'createdAt'>,
+  chat: Omit<Chat, 'id' | 'createdAt'> & { requestId?: string },
 ): ChatCreateRequestDto => {
   return {
     title: chat.title,
+    requestId: chat.requestId,
   };
 };
 

@@ -10,14 +10,17 @@ export function LandingFooter() {
         </div>
 
         <nav aria-label="Footer" className="flex items-center gap-4 text-sm">
-          <Button href="/" variant="footer">
-            Docs
+          <Button href="/#pricing" variant="footer">
+            Pricing
           </Button>
-          <Button href="/" variant="footer">
-            GitHub
-          </Button>
-          <Button href="/" variant="footer">
+          <Button href="/privacy" variant="footer">
             Privacy
+          </Button>
+          <Button href="/data-policy" variant="footer">
+            Data Policy
+          </Button>
+          <Button href="/terms" variant="footer">
+            Terms
           </Button>
         </nav>
       </div>

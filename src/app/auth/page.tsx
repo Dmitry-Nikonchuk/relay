@@ -81,14 +81,18 @@ export default async function AuthPage({
                 href="/privacy"
                 className="font-medium text-primary underline underline-offset-2"
               >
-                privacy &amp; cookies
+                privacy policy
               </Link>
               ).
             </p>
           </Field>
 
           <p className="mt-8 text-center text-xs text-muted">
-            By continuing you agree that Relay may set session cookies to keep you signed in.
+            By continuing you agree to the use of essential session cookies and to the{' '}
+            <Link href="/terms" className="font-medium text-primary underline underline-offset-2">
+              Terms of Use
+            </Link>
+            .
           </p>
         </section>
       </div>

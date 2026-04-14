@@ -6,6 +6,14 @@ export type ChatMessage = {
   createdAt?: string;
 };
 
+export type ChatFailedReply = {
+  userMessageId: string;
+  userText: string;
+  errorMessage: string;
+  canRetry: boolean;
+  failedAt: string;
+};
+
 export type Chat = {
   id: string;
   title: string;

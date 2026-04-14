@@ -4,7 +4,7 @@ import type { FC } from 'react';
 import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { Chat } from '@/entities/chat';
 import { Modal } from '@/shared/ui/Modal';
-import { CirclePlus } from 'lucide-react';
+import { CirclePlus, Search, X } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { Input } from '@/shared/ui/Input';
 import { cn } from '@/shared/lib/cn';
@@ -31,7 +31,9 @@ export const ChatsList: FC<Props> = ({
   const [deleteChatId, setDeleteChatId] = useState<string | null>(null);
   const [renameChatId, setRenameChatId] = useState<string | null>(null);
   const [renameInputValue, setRenameInputValue] = useState<string>('');
+  const [searchInputValue, setSearchInputValue] = useState<string>('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useLayoutEffect(() => {
     if (!renameChatId) {
@@ -93,37 +95,66 @@ export const ChatsList: FC<Props> = ({
                 <CirclePlus size={16} />
               </button>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto rounded-md bg-surface/60 py-1">
-              <div className="flex flex-col gap-2">
-                {chats.map((item) => {
-                  return (
-                    <div
-                      className={cn(
-                        'group text-left overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 rounded-md pr-8 relative',
-                        selectedChatId === item.id && 'text-primary bg-primary/10',
-                        'cursor-pointer',
-                      )}
-                      key={item.id}
-                      onClick={() => onChatClick?.(item.id)}
-                    >
-                      {renameChatId === item.id ? (
-                        <Input
-                          ref={renameInputRef}
-                          value={renameInputValue}
-                          onChange={(e) => setRenameInputValue(e.target.value)}
-                          onBlur={(e) => handleSubmitRename(e.target.value)}
-                          onPressEnter={() => handleSubmitRename(renameInputValue)}
+            <div className="mt-1 mb-1 flex items-center justify-start border border-border rounded-md">
+              <Input
+                placeholder="Search chats..."
+                className="h-8 text-xs border-none bg-transparent"
+                value={searchInputValue}
+                onChange={(e) => setSearchInputValue(e.target.value)}
+                ref={searchInputRef}
+              />
+              <div className="w-10 h-8 flex items-center justify-center">
+                {searchInputValue ? (
+                  <X
+                    size={14}
+                    className="text-gray-500 cursor-pointer"
+                    onClick={() => setSearchInputValue('')}
+                  />
+                ) : (
+                  <Search
+                    size={14}
+                    className="text-gray-500 cursor-pointer"
+                    onClick={() => searchInputRef.current?.focus()}
+                  />
+                )}
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto rounded-md py-1">
+              <div className="flex flex-col gap-1">
+                {chats
+                  .filter((item) =>
+                    item.title.toLowerCase().includes(searchInputValue.toLowerCase()),
+                  )
+                  .map((item) => {
+                    return (
+                      <div
+                        className={cn(
+                          'group text-left overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 rounded-md pr-8 relative text-sm text-text/80 hover:bg-primary/5 transition-bg duration-300',
+                          selectedChatId === item.id &&
+                            'text-text bg-primary/10 hover:bg-primary/10',
+                          'cursor-pointer',
+                        )}
+                        key={item.id}
+                        onClick={() => onChatClick?.(item.id)}
+                      >
+                        {renameChatId === item.id ? (
+                          <Input
+                            ref={renameInputRef}
+                            value={renameInputValue}
+                            onChange={(e) => setRenameInputValue(e.target.value)}
+                            onBlur={(e) => handleSubmitRename(e.target.value)}
+                            onPressEnter={() => handleSubmitRename(renameInputValue)}
+                          />
+                        ) : (
+                          item.title
+                        )}
+                        <ChatItemDropdownMenu
+                          onDelete={() => handleDeleteClick?.(item.id)}
+                          onRename={() => handleRenameChat(item.id)}
                         />
-                      ) : (
-                        item.title
-                      )}
-                      <ChatItemDropdownMenu
-                        onDelete={() => handleDeleteClick?.(item.id)}
-                        onRename={() => handleRenameChat(item.id)}
-                      />
-                    </div>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </div>

@@ -22,8 +22,8 @@ export type GuardrailOperationPolicyDefinition = {
 
 export type GuardrailTierPolicyDefinition = {
   maxUserMessageChars: number;
-  dailyUserVisibleTokens: number;
-  dailySystemTokens: number;
+  dailyUserVisibleTokens: number | null;
+  dailySystemTokens: number | null;
   operations: {
     chat: GuardrailOperationPolicyDefinition;
     title: GuardrailOperationPolicyDefinition;
@@ -63,8 +63,8 @@ export const CHAT_MODEL_CATALOG: ChatModelDefinition[] = [
 
 const FREE_GUARDRAIL_POLICY: GuardrailTierPolicyDefinition = {
   maxUserMessageChars: 8_000,
-  dailyUserVisibleTokens: 100_000,
-  dailySystemTokens: 12_000,
+  dailyUserVisibleTokens: null,
+  dailySystemTokens: null,
   operations: {
     chat: {
       maxPromptChars: 24_000,

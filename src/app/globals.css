@@ -27,6 +27,10 @@
     @apply box-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   html,
   body {
     @apply m-0 p-0;
@@ -42,5 +46,11 @@
       'cv11' on;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }

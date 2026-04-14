@@ -7,13 +7,13 @@ export type UserPlanUsageScopeDto = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  remainingTokens: number;
+  remainingTokens: number | null;
 };
 
 export type UserPlanGuardrailsDto = {
   maxUserMessageChars: number;
-  dailyUserVisibleTokens: number;
-  dailySystemTokens: number;
+  dailyUserVisibleTokens: number | null;
+  dailySystemTokens: number | null;
   operations: {
     chat: GuardrailOperationPolicyDefinition;
     title: GuardrailOperationPolicyDefinition;

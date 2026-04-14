@@ -7,11 +7,14 @@ import {
   ChatRenameRequestDtoSchema,
   type ChatListRow,
 } from '@/entities/chat';
+import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
+import { internalServerErrorResponse, invalidPayloadResponse } from '@/shared/lib/api/errors';
 
 export async function handleCreateChat(req: Request, userId: string) {
   try {
     const body = JSON.parse(await req.text());
     const dto = ChatCreateRequestDtoSchema.parse(body);
+    const requestId = dto.requestId ?? createRequestId();
 
     const chatId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -24,17 +27,38 @@ export async function handleCreateChat(req: Request, userId: string) {
       },
     ]);
 
+    logChatEvent(
+      'info',
+      {
+        request_id: requestId,
+        user_id: userId,
+        chat_id: chatId,
+      },
+      {
+        stage: 'chat_creation',
+        event: 'chat_created',
+      },
+    );
+
     return Response.json({ id: chatId, title: dto.title, createdAt: now });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: 'Invalid payload', details: treeifyError(error) },
-        { status: 400 },
-      );
+      return invalidPayloadResponse(treeifyError(error));
     }
 
-    console.error(error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    logChatEvent(
+      'error',
+      {
+        request_id: createRequestId(),
+        user_id: userId,
+      },
+      {
+        stage: 'chat_creation',
+        event: 'chat_create_failed',
+        error: serializeError(error),
+      },
+    );
+    return internalServerErrorResponse();
   }
 }
 

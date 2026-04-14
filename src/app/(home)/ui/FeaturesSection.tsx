@@ -1,19 +1,25 @@
+import { Compass, Gauge, LayoutPanelTop, MessagesSquare } from 'lucide-react';
+
 const features = [
   {
     title: 'Fast responses',
     description: 'Minimal latency. High signal replies. Keep momentum in every thread.',
+    icon: Gauge,
   },
   {
     title: 'Multiple models',
     description: 'Pick the right model for writing, coding, analysis, or quick drafts.',
+    icon: Compass,
   },
   {
     title: 'Context aware',
     description: 'Relay keeps your thread state clear, so follow-ups stay accurate.',
+    icon: MessagesSquare,
   },
   {
     title: 'Beautiful UI',
     description: 'Focused layout, readable messages, and polished interactions by default.',
+    icon: LayoutPanelTop,
   },
 ];
 
@@ -35,6 +41,9 @@ export function FeaturesSection() {
               className="landing-glass-card group p-5 transition duration-300 hover:-translate-y-1"
               style={{ animationDelay: `${index * 70}ms` }}
             >
+              <span className="landing-icon-chip">
+                <feature.icon className="h-5 w-5" />
+              </span>
               <h3 className="text-lg font-semibold tracking-tight text-[var(--color-text)]">
                 {feature.title}
               </h3>

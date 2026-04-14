@@ -32,6 +32,13 @@ function formatPercent(used: number, total: number): number {
   return Math.max(0, Math.min(100, Math.round((used / total) * 100)));
 }
 
+function formatQuota(value: number | null): string {
+  if (value == null) {
+    return 'No daily cap';
+  }
+  return `${formatCompact(value)} tokens`;
+}
+
 function getPlanModelCount(tier: ChatSubscriptionTier): number {
   if (tier === 'pro') {
     return CHAT_MODEL_CATALOG.length;
@@ -48,11 +55,11 @@ type ScopeCardProps = {
   description: string;
   helper: string;
   data: UserPlanAndUsageResponseDto['usageToday']['userVisible'];
-  total: number;
+  total: number | null;
 };
 
 function ScopeCard({ title, description, helper, data, total }: ScopeCardProps) {
-  const percent = formatPercent(data.totalTokens, total);
+  const percent = total == null ? 0 : formatPercent(data.totalTokens, total);
 
   return (
     <div className="rounded-xl border border-border bg-white/70 p-4">
@@ -62,25 +69,45 @@ function ScopeCard({ title, description, helper, data, total }: ScopeCardProps) 
           <p className="mt-1 text-xs leading-relaxed text-muted">{description}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold text-text">
-            {formatCompact(data.totalTokens)} / {formatCompact(total)}
-          </p>
-          <p className="text-xs text-muted">{formatCompact(data.remainingTokens)} left today</p>
+          {total == null ? (
+            <>
+              <p className="text-sm font-semibold text-text">{formatCompact(data.totalTokens)}</p>
+              <p className="text-xs text-muted">used today</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-text">
+                {formatCompact(data.totalTokens)} / {formatCompact(total)}
+              </p>
+              <p className="text-xs text-muted">
+                {formatCompact(data.remainingTokens ?? 0)} left today
+              </p>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="mt-4">
-        <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
-          <div
-            className="h-full rounded-full bg-primary transition-[width]"
-            style={{ width: `${percent}%` }}
-          />
+      {total == null ? (
+        <div className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-3">
+          <p className="text-xs leading-relaxed text-emerald-900">
+            This plan does not have a daily token cap. The number above is only a usage counter for
+            today.
+          </p>
         </div>
-        <div className="mt-2 flex items-center justify-between text-xs text-muted">
-          <span>{percent}% used</span>
-          <span>Resets daily</span>
+      ) : (
+        <div className="mt-4">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+            <div
+              className="h-full rounded-full bg-primary transition-[width]"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-muted">
+            <span>{percent}% used</span>
+            <span>Resets daily</span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-4 rounded-lg border border-border/80 bg-surface/70 px-3 py-3">
         <p className="text-xs leading-relaxed text-muted">{helper}</p>
@@ -100,6 +127,7 @@ export function ProfilePlanUsageSection({ data }: Props) {
   const otherPlanPolicy = getGuardrailTierPolicy(otherTier);
   const currentModelCount = getPlanModelCount(data.tier);
   const otherModelCount = getPlanModelCount(otherTier);
+  const hasDailyChatCap = data.guardrails.dailyUserVisibleTokens != null;
 
   return (
     <section className="border-t border-border pt-6">
@@ -127,16 +155,24 @@ export function ProfilePlanUsageSection({ data }: Props) {
           <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted">
             {data.tier === 'pro'
               ? 'You have the larger daily allowance and more generous message and rate limits for heavier chat use.'
-              : 'You have the starter plan with daily limits that are suitable for regular personal use.'}
+              : 'You can use free chat models without a daily token cap. The profile keeps usage visible, while message and speed limits still protect the app.'}
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-border/80 bg-surface/70 p-3">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Daily chat use</p>
-              <p className="mt-1 text-base font-semibold text-text">
-                {formatCompact(data.guardrails.dailyUserVisibleTokens)} tokens
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted">
+                {hasDailyChatCap ? 'Daily chat use' : 'Usage tracking'}
               </p>
-              <p className="mt-1 text-xs text-muted">How much chatting you can do today.</p>
+              <p className="mt-1 text-base font-semibold text-text">
+                {hasDailyChatCap
+                  ? formatQuota(data.guardrails.dailyUserVisibleTokens)
+                  : `${formatCompact(data.usageToday.userVisible.totalTokens)} used today`}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {hasDailyChatCap
+                  ? 'How much chatting you can do today.'
+                  : 'No daily token limit. This is only a counter so you can see today’s usage.'}
+              </p>
             </div>
             <div className="rounded-xl border border-border/80 bg-surface/70 p-3">
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Message size</p>
@@ -197,14 +233,17 @@ export function ProfilePlanUsageSection({ data }: Props) {
           <div className="mt-5 space-y-3">
             <div className="rounded-xl border border-border/80 bg-surface/70 p-3">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-text">Daily chat allowance</span>
+                <span className="text-sm font-medium text-text">Daily token policy</span>
                 <span className="text-sm font-semibold text-text">
-                  {formatCompact(data.guardrails.dailyUserVisibleTokens)} vs{' '}
-                  {formatCompact(otherPlanPolicy.dailyUserVisibleTokens)}
+                  {formatQuota(data.guardrails.dailyUserVisibleTokens)} vs{' '}
+                  {formatQuota(otherPlanPolicy.dailyUserVisibleTokens)}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted">
-                More allowance means more replies and longer sessions before the daily reset.
+                {data.guardrails.dailyUserVisibleTokens == null ||
+                otherPlanPolicy.dailyUserVisibleTokens == null
+                  ? 'Free usage can stay uncapped when only free models are available, while other plans may use a daily allowance model.'
+                  : 'More allowance means more replies and longer sessions before the daily reset.'}
               </p>
             </div>
 
@@ -258,16 +297,12 @@ export function ProfilePlanUsageSection({ data }: Props) {
               prompts, longer replies, or both.
             </p>
             <p>
-              Your <span className="font-medium text-text">chat budget</span> affects sending and
-              receiving replies. The <span className="font-medium text-text">system budget</span> is
-              reserved for helpers like automatic titles and chat memory.
-            </p>
-            <p>
               Limits reset at{' '}
               <span className="font-medium text-text">
                 {formatResetTime(data.usageToday.resetAt)}
               </span>
-              .
+              . On the free plan, this reset time matters for burst limits, but not for a daily chat
+              cap.
             </p>
           </div>
         </div>
@@ -296,28 +331,25 @@ export function ProfilePlanUsageSection({ data }: Props) {
             <div className="rounded-lg border border-border/80 bg-surface/70 p-3">
               <p className="text-sm font-medium text-text">Background helpers</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                Titles and memory use a separate smaller budget so they don&apos;t block normal chat
-                too early.
+                Titles and memory run in the background. They should stay out of your way during
+                normal chat use.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6">
         <ScopeCard
           title="Today's chat usage"
           description="This is the part that affects sending new prompts and getting replies."
-          helper="If this fills up, you will need to wait until the daily reset before continuing to chat."
+          helper={
+            data.guardrails.dailyUserVisibleTokens == null
+              ? 'This is usage tracking only. On the free plan, it does not stop you when it grows.'
+              : 'If this fills up, you will need to wait until the daily reset before continuing to chat.'
+          }
           data={data.usageToday.userVisible}
           total={data.guardrails.dailyUserVisibleTokens}
-        />
-        <ScopeCard
-          title="Today's helper usage"
-          description="Used by things like automatic titles and conversation memory in the background."
-          helper="If this budget runs out, chat still works, but some automatic helpers may pause until reset."
-          data={data.usageToday.system}
-          total={data.guardrails.dailySystemTokens}
         />
       </div>
 
