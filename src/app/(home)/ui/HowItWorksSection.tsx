@@ -1,15 +1,20 @@
+import { Bot, MessageSquareMore, Sparkles } from 'lucide-react';
+
 const steps = [
   {
     title: 'Create chat',
     description: 'Start a new thread with a clear goal and structured prompt.',
+    icon: MessageSquareMore,
   },
   {
     title: 'Choose model',
     description: 'Select the model that fits your task in one click.',
+    icon: Bot,
   },
   {
     title: 'Start talking',
     description: 'Iterate quickly with context-preserving responses.',
+    icon: Sparkles,
   },
 ];
 
@@ -25,6 +30,11 @@ export function HowItWorksSection() {
           {steps.map((step, i) => (
             <li key={step.title} className="landing-step-card">
               <span className="landing-step-badge">0{i + 1}</span>
+              <div className="mt-4">
+                <span className="landing-icon-chip">
+                  <step.icon className="h-5 w-5" />
+                </span>
+              </div>
               <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-text)]">
                 {step.title}
               </h3>

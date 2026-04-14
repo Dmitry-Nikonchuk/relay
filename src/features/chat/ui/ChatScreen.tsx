@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Chat, ChatMessage } from '@/entities/chat';
+import { Chat, ChatFailedReply, ChatMessage } from '@/entities/chat';
 import type { UserChatModelsResponseDto } from '@/features/user/model/userChatModels.types';
 import { chatApi } from '../lib/chatApi';
 import {
@@ -16,6 +16,7 @@ import {
   type ChatSendFailureState,
   canRetrySendError,
   getChatSendErrorMessage,
+  toFailedReplyState,
   trimTrailingAssistant,
 } from '../lib/sendFailure';
 import { ChatForm, type ActiveChatModelInfo } from './ChatForm';
@@ -27,6 +28,7 @@ type Props = {
   initialChats: Chat[];
   initialMessages: ChatMessage[];
   initialMessagesHasMore: boolean;
+  initialFailedReply: ChatFailedReply | null;
   /** `?chatId=` from URL; `null` when absent or not in list */
   chatIdFromUrl: string | null;
   currentUser: ChatSidebarUser;
@@ -36,6 +38,7 @@ export function ChatScreen({
   initialChats,
   initialMessages,
   initialMessagesHasMore,
+  initialFailedReply,
   chatIdFromUrl,
   currentUser,
 }: Props) {
@@ -53,6 +56,7 @@ export function ChatScreen({
   const [userChatModels, setUserChatModels] = useState<UserChatModelsResponseDto | null>(null);
   const [isLoadingChatModel, setIsLoadingChatModel] = useState(true);
   const [sendFailure, setSendFailure] = useState<ChatSendFailureState | null>(null);
+  const [failedReply, setFailedReply] = useState<ChatFailedReply | null>(initialFailedReply);
   const prevChatIdRef = useRef<string | null | undefined>(undefined);
 
   const applyChatModels = useCallback((d: UserChatModelsResponseDto) => {
@@ -116,7 +120,14 @@ export function ChatScreen({
     setHasOlderMessages(initialMessagesHasMore);
     setFirstItemIndex(VIRTUOSO_FIRST_ITEM_INDEX);
     setSendFailure(null);
-  }, [chatIdFromUrl, initialMessages, initialMessagesHasMore, isSendInProgress]);
+    setFailedReply(initialFailedReply);
+  }, [
+    chatIdFromUrl,
+    initialMessages,
+    initialMessagesHasMore,
+    initialFailedReply,
+    isSendInProgress,
+  ]);
 
   useEffect(() => {
     setMessagesScrollEpoch((n) => n + 1);
@@ -198,14 +209,17 @@ export function ChatScreen({
 
   const runAssistantStream = async (
     chatId: string,
+    userMessageId: string,
     userMessageForTitle: string,
     runTitle: boolean,
   ) => {
+    const requestId = crypto.randomUUID();
     let accumulated = '';
     setMessages((prev) => [...prev, { role: 'assistant', content: '' } as ChatMessage]);
 
     const fullText = await chatApi.streamMessages(
       String(chatId),
+      userMessageId,
       (chunk) => {
         accumulated += chunk;
         setMessages((prev) => {
@@ -219,10 +233,10 @@ export function ChatScreen({
           return next;
         });
       },
-      { model: streamModelId },
+      { model: streamModelId, requestId },
     );
 
-    await chatApi.appendMessage(String(chatId), 'assistant', fullText);
+    setFailedReply(null);
     router.refresh();
 
     if (runTitle) {
@@ -253,44 +267,65 @@ export function ChatScreen({
     }
 
     setSendFailure(null);
+    setFailedReply(null);
 
     const currentChatId = chatIdFromUrl;
     const isFirstMessageNewChat = !currentChatId;
+    const requestId = crypto.randomUUID();
 
     let effectiveChatId: string | null = currentChatId ? String(currentChatId) : null;
     let userRecordedInDb = false;
+    let userMessageId: string | null = null;
 
     setIsSendInProgress(true);
     try {
       if (!currentChatId) {
-        const chat = await chatApi.createChat({ title: PLACEHOLDER_CHAT_TITLE });
+        const chat = await chatApi.createChat({ title: PLACEHOLDER_CHAT_TITLE }, { requestId });
         effectiveChatId = chat.id;
         setChatTitle(chat.title);
         router.replace(`/chat?chatId=${encodeURIComponent(effectiveChatId)}`);
-        await chatApi.appendMessage(effectiveChatId, 'user', trimmed);
+        const persisted = await chatApi.appendMessage(effectiveChatId, 'user', trimmed, {
+          requestId,
+        });
+        userMessageId = persisted.id;
         userRecordedInDb = true;
       } else {
-        await chatApi.appendMessage(String(currentChatId), 'user', trimmed);
+        const persisted = await chatApi.appendMessage(String(currentChatId), 'user', trimmed, {
+          requestId,
+        });
+        userMessageId = persisted.id;
         userRecordedInDb = true;
         effectiveChatId = String(currentChatId);
       }
 
-      if (!effectiveChatId) {
+      if (!effectiveChatId || !userMessageId) {
         throw new Error('Chat could not be created');
       }
 
-      await runAssistantStream(effectiveChatId, trimmed, isFirstMessageNewChat);
+      await runAssistantStream(effectiveChatId, userMessageId, trimmed, isFirstMessageNewChat);
       return true;
     } catch (e) {
       setMessages((prev) => trimTrailingAssistant(prev));
-      setSendFailure({
-        userText: trimmed,
-        error: getChatSendErrorMessage(e),
-        canRetry: canRetrySendError(e),
-        userPersisted: userRecordedInDb,
-        chatId: effectiveChatId,
-        generateTitleAfterStream: isFirstMessageNewChat,
-      });
+      if (userRecordedInDb && userMessageId) {
+        setFailedReply(
+          toFailedReplyState({
+            userMessageId,
+            userText: trimmed,
+            error: getChatSendErrorMessage(e),
+            canRetry: canRetrySendError(e),
+          }),
+        );
+      } else {
+        setSendFailure({
+          userText: trimmed,
+          error: getChatSendErrorMessage(e),
+          canRetry: canRetrySendError(e),
+          userPersisted: userRecordedInDb,
+          chatId: effectiveChatId,
+          userMessageId,
+          generateTitleAfterStream: isFirstMessageNewChat,
+        });
+      }
       return false;
     } finally {
       setIsSendInProgress(false);
@@ -298,6 +333,32 @@ export function ChatScreen({
   };
 
   const retryFailedSend = async () => {
+    if (failedReply && chatIdFromUrl) {
+      if (!failedReply.canRetry) {
+        return;
+      }
+      setFailedReply(null);
+      setIsSendInProgress(true);
+      try {
+        const shouldGenerateTitle = chatTitle === PLACEHOLDER_CHAT_TITLE;
+        await runAssistantStream(
+          chatIdFromUrl,
+          failedReply.userMessageId,
+          failedReply.userText,
+          shouldGenerateTitle,
+        );
+      } catch (e) {
+        setMessages((prev) => trimTrailingAssistant(prev));
+        setFailedReply({
+          ...failedReply,
+          errorMessage: getChatSendErrorMessage(e),
+        });
+      } finally {
+        setIsSendInProgress(false);
+      }
+      return;
+    }
+
     if (!sendFailure) {
       return;
     }
@@ -311,14 +372,23 @@ export function ChatScreen({
 
     try {
       if (userPersisted && chatId) {
-        await runAssistantStream(chatId, userText, generateTitleAfterStream);
+        if (!sendFailure.userMessageId) {
+          throw new Error('Missing user message id');
+        }
+        await runAssistantStream(
+          chatId,
+          sendFailure.userMessageId,
+          userText,
+          generateTitleAfterStream,
+        );
         return;
       }
 
       if (chatId && !userPersisted) {
-        await chatApi.appendMessage(chatId, 'user', userText);
+        const requestId = crypto.randomUUID();
+        const persisted = await chatApi.appendMessage(chatId, 'user', userText, { requestId });
         recorded = true;
-        await runAssistantStream(chatId, userText, generateTitleAfterStream);
+        await runAssistantStream(chatId, persisted.id, userText, generateTitleAfterStream);
         return;
       }
 
@@ -334,6 +404,7 @@ export function ChatScreen({
         canRetry: canRetrySendError(e),
         userPersisted: recorded,
         chatId: cid,
+        userMessageId: sendFailure.userMessageId,
         generateTitleAfterStream,
       });
     } finally {
@@ -351,7 +422,10 @@ export function ChatScreen({
     <div className="min-h-screen max-h-screen overflow-hidden flex justify-center py-6 px-3 bg-bg">
       <div className="w-full max-w-[1120px] flex gap-4 items-stretch">
         <aside className="flex min-h-0 w-[280px] shrink-0 flex-col self-stretch rounded-lg border border-border bg-gradient-to-br from-white to-[#f4f5ff] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.04),0_0_0_1px_rgba(148,163,184,0.04)]">
-          <div className="mb-4 flex shrink-0 items-center gap-2">
+          <div
+            className="mb-4 flex shrink-0 items-center gap-2 cursor-pointer"
+            onClick={() => router.push('/')}
+          >
             <div className="flex h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-lg">
               <Image src="/logo.png" alt="Relay logo" width={36} height={36} />
             </div>
@@ -407,6 +481,7 @@ export function ChatScreen({
                   hasOlder={hasOlderMessages}
                   isLoadingOlder={isLoadingOlderMessages}
                   sendFailure={sendFailure}
+                  failedReply={failedReply}
                   onRetrySend={retryFailedSend}
                 />
               </div>

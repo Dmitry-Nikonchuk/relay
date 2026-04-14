@@ -78,7 +78,7 @@ export function scopeForOperation(operation: GuardrailOperation): GuardrailUsage
   return operation === 'chat' ? 'user_visible' : 'system';
 }
 
-function quotaForScope(tier: GuardrailTier, scope: GuardrailUsageScope): number {
+function quotaForScope(tier: GuardrailTier, scope: GuardrailUsageScope): number | null {
   const policy = getGuardrailTierPolicy(tier);
   return scope === 'user_visible' ? policy.dailyUserVisibleTokens : policy.dailySystemTokens;
 }
@@ -143,13 +143,19 @@ export async function getGuardrailUsageSummary(userId: string, tier: GuardrailTi
       promptTokens: userVisible.prompt_tokens,
       completionTokens: userVisible.completion_tokens,
       totalTokens: userVisible.total_tokens,
-      remainingTokens: Math.max(0, policy.dailyUserVisibleTokens - userVisible.total_tokens),
+      remainingTokens:
+        policy.dailyUserVisibleTokens == null
+          ? null
+          : Math.max(0, policy.dailyUserVisibleTokens - userVisible.total_tokens),
     },
     system: {
       promptTokens: system.prompt_tokens,
       completionTokens: system.completion_tokens,
       totalTokens: system.total_tokens,
-      remainingTokens: Math.max(0, policy.dailySystemTokens - system.total_tokens),
+      remainingTokens:
+        policy.dailySystemTokens == null
+          ? null
+          : Math.max(0, policy.dailySystemTokens - system.total_tokens),
     },
   };
 }
@@ -349,7 +355,7 @@ export async function checkGuardrails(input: GuardrailCheckInput): Promise<Guard
   const projectedTotal = currentDailyUsage + input.estimatedPromptTokens + reservedCompletionTokens;
   const dailyQuota = quotaForScope(tier, scope);
 
-  if (projectedTotal > dailyQuota) {
+  if (dailyQuota != null && projectedTotal > dailyQuota) {
     const resetAt = getNextUtcDateIso();
     const denial: GuardrailDenial = {
       status: 403,

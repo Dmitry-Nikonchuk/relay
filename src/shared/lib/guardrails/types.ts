@@ -25,8 +25,8 @@ export type GuardrailOperationPolicy = {
 export type GuardrailTierPolicy = {
   allowedModels: ChatModelDefinition[];
   maxUserMessageChars: number;
-  dailyUserVisibleTokens: number;
-  dailySystemTokens: number;
+  dailyUserVisibleTokens: number | null;
+  dailySystemTokens: number | null;
   operations: Record<GuardrailOperation, GuardrailOperationPolicy>;
 };
 

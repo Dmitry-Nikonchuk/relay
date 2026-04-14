@@ -15,7 +15,7 @@ export type ActiveChatModelInfo = {
 const formClass = {
   /** Docked under messages: tint + top edge so it reads as a separate strip from `bg-surface`. */
   default:
-    'flex w-full flex-col gap-1 border-t border-border/80 bg-bg py-3 px-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]',
+    'flex w-[95%] mx-auto flex-col gap-1 border border-border/80 rounded-sm bg-bg py-3 px-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]',
   empty:
     'flex w-full flex-col gap-1 rounded-xl border border-border bg-gradient-to-b from-slate-50 to-slate-100/90 px-4 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.06),0_0_0_1px_rgba(148,163,184,0.06)] sm:px-5',
 } as const;

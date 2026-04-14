@@ -10,6 +10,7 @@ import {
   HowItWorksSection,
   LandingFooter,
   LandingHeader,
+  PricingSection,
 } from './ui';
 
 const manrope = Manrope({
@@ -38,6 +39,7 @@ export default function HomePage() {
       <main>
         <HeroSection />
         <FeaturesSection />
+        <PricingSection />
         <HowItWorksSection />
         <DemoPreviewSection />
         <BenefitsSection />

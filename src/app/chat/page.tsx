@@ -1,5 +1,5 @@
 import { mapChatListRowToChat } from '@/entities/chat';
-import type { ChatMessage } from '@/entities/chat';
+import type { ChatFailedReply, ChatMessage } from '@/entities/chat';
 import { ChatScreen } from '@/features/chat';
 import { listChatsForUser } from '@/features/chat/server/chat';
 import { MESSAGE_PAGE_DEFAULT_LIMIT } from '@/features/chat/lib/constants';
@@ -28,11 +28,13 @@ export default async function ChatPage({ searchParams }: PageProps) {
 
   let initialMessages: ChatMessage[] = [];
   let initialMessagesHasMore = false;
+  let initialFailedReply: ChatFailedReply | null = null;
   if (validChatId) {
     const page = await listMessagesLatestPage(validChatId, MESSAGE_PAGE_DEFAULT_LIMIT, userId);
     if (page) {
       initialMessages = page.messages;
       initialMessagesHasMore = page.hasMore;
+      initialFailedReply = page.failedReply;
     }
   }
 
@@ -47,6 +49,7 @@ export default async function ChatPage({ searchParams }: PageProps) {
       initialChats={initialChats}
       initialMessages={initialMessages}
       initialMessagesHasMore={initialMessagesHasMore}
+      initialFailedReply={initialFailedReply}
       chatIdFromUrl={validChatId}
       currentUser={currentUser}
     />

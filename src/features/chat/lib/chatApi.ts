@@ -1,5 +1,6 @@
 import { httpClient } from '@/shared/lib/http/client';
 import {
+  ChatFailedReplyDto,
   mapChatMessagesToCompleteRequestDto,
   mapChatCompleteResponseDtoToChatMessage,
   mapChatToCreateRequestDto,
@@ -42,12 +43,18 @@ export const chatApi = {
 
   async streamMessages(
     chatId: string,
+    userMessageId: string,
     onDelta: (chunk: string) => void,
-    opts?: { model?: string },
+    opts?: { model?: string; requestId?: string },
   ): Promise<string> {
     const res = await httpClient.stream('/api/chat/stream', {
       method: 'POST',
-      body: JSON.stringify({ chatId, model: opts?.model }),
+      body: JSON.stringify({
+        chatId,
+        userMessageId,
+        model: opts?.model,
+        requestId: opts?.requestId,
+      }),
     });
 
     const reader = res.body!.getReader();
@@ -118,10 +125,10 @@ export const chatApi = {
     return response.chatTitle;
   },
 
-  async createChat(chat: Omit<Chat, 'id' | 'createdAt'>) {
+  async createChat(chat: Omit<Chat, 'id' | 'createdAt'>, opts?: { requestId?: string }) {
     const dto = mapChatToCreateRequestDto(chat);
     const response = await httpClient.post<ChatCreateResponseDto>('/api/chat', {
-      body: JSON.stringify(dto),
+      body: JSON.stringify({ ...dto, requestId: opts?.requestId }),
     });
 
     return mapChatCreateResponseDtoToChat(response);
@@ -130,7 +137,7 @@ export const chatApi = {
   async fetchMessagesPage(
     chatId: string,
     opts: { limit: number; before?: { createdAt: string; id: string } },
-  ): Promise<ChatHistoryPageResponseDto> {
+  ): Promise<ChatHistoryPageResponseDto & { failedReply?: ChatFailedReplyDto | null }> {
     const qs = new URLSearchParams({ chatId, limit: String(opts.limit) });
     if (opts.before) {
       qs.set('beforeCreatedAt', opts.before.createdAt);
@@ -139,9 +146,14 @@ export const chatApi = {
     return httpClient.get<ChatHistoryPageResponseDto>(`/api/chat/history?${qs.toString()}`);
   },
 
-  async appendMessage(chatId: string, role: ChatMessage['role'], content: string) {
+  async appendMessage(
+    chatId: string,
+    role: ChatMessage['role'],
+    content: string,
+    opts?: { requestId?: string },
+  ) {
     return httpClient.post<{ id: string }>('/api/chat/history', {
-      body: JSON.stringify({ chatId, role, content }),
+      body: JSON.stringify({ chatId, role, content, requestId: opts?.requestId }),
     });
   },
 

@@ -63,7 +63,18 @@ export default async function ProfilePage() {
                 href="/privacy"
                 className="font-medium text-primary underline underline-offset-2"
               >
-                Privacy &amp; cookies
+                Privacy Policy
+              </Link>{' '}
+              ·{' '}
+              <Link
+                href="/data-policy"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                Data Policy
+              </Link>{' '}
+              ·{' '}
+              <Link href="/terms" className="font-medium text-primary underline underline-offset-2">
+                Terms of Use
               </Link>
             </p>
           </div>

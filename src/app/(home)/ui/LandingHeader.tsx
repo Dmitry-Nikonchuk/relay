@@ -26,6 +26,9 @@ export function LandingHeader() {
           <Button href="#features" variant="nav">
             Features
           </Button>
+          <Button href="#pricing" variant="nav">
+            Pricing
+          </Button>
           <Button href="#how-it-works" variant="nav">
             How it works
           </Button>

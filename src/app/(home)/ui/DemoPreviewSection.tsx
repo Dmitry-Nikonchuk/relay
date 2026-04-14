@@ -1,3 +1,5 @@
+import { BadgeCheck, Sparkles, TimerReset } from 'lucide-react';
+
 const demoMessages = [
   {
     role: 'User',
@@ -30,36 +32,89 @@ export function DemoPreviewSection() {
           Conversations stay readable, structured, and easy to continue.
         </p>
 
-        <div className="mt-8 overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)]/75 shadow-[0_24px_80px_rgba(17,17,35,0.12)] backdrop-blur-lg lg:mt-10">
-          <div className="flex items-center gap-2 border-b border-[var(--color-border)]/80 px-5 py-4">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff6767]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ffca4f]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#4ad97b]" />
-            <p className="ml-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-muted)]">
-              Demo chat
-            </p>
-          </div>
+        <div className="landing-product-panel mt-8 p-4 lg:mt-10">
+          <div className="landing-product-noise" aria-hidden="true" />
+          <div className="relative grid gap-4 lg:grid-cols-[1.06fr_0.94fr]">
+            <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)]/75 shadow-[0_24px_80px_rgba(17,17,35,0.12)] backdrop-blur-lg">
+              <div className="flex items-center gap-2 border-b border-[var(--color-border)]/80 px-5 py-4">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#ff6767]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#ffca4f]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#4ad97b]" />
+                <p className="ml-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                  Demo chat
+                </p>
+              </div>
 
-          <div className="space-y-3 p-4 sm:p-6">
-            {demoMessages.map((message) => {
-              const isUser = message.role === 'User';
+              <div className="space-y-3 p-4 sm:p-6">
+                {demoMessages.map((message) => {
+                  const isUser = message.role === 'User';
 
-              return (
-                <article
-                  key={`${message.role}-${message.content}`}
-                  className={`max-w-[90%] rounded-2xl border px-4 py-3 text-sm leading-6 sm:max-w-[78%] ${
-                    isUser
-                      ? 'ml-auto border-[var(--color-primary)]/30 bg-[var(--color-primary)]/12 text-[var(--color-text)]'
-                      : 'mr-auto border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)]'
-                  }`}
-                >
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
-                    {message.role}
-                  </p>
-                  <p>{message.content}</p>
-                </article>
-              );
-            })}
+                  return (
+                    <article
+                      key={`${message.role}-${message.content}`}
+                      className={`max-w-[90%] rounded-2xl border px-4 py-3 text-sm leading-6 sm:max-w-[78%] ${
+                        isUser
+                          ? 'ml-auto border-[var(--color-primary)]/30 bg-[var(--color-primary)]/12 text-[var(--color-text)]'
+                          : 'mr-auto border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)]'
+                      }`}
+                    >
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                        {message.role}
+                      </p>
+                      <p>{message.content}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <div className="landing-dashboard-card p-5">
+                <div className="flex items-center gap-3">
+                  <span className="landing-icon-chip">
+                    <BadgeCheck className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-text)]">
+                      Production-ready patterns
+                    </p>
+                    <p className="text-sm text-[var(--color-muted)]">
+                      Auth, persistence, and plan-aware model access.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="landing-dashboard-card p-5">
+                <div className="flex items-center gap-3">
+                  <span className="landing-icon-chip">
+                    <TimerReset className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-text)]">Reliable chat</p>
+                    <p className="text-sm text-[var(--color-muted)]">
+                      Failed replies can be surfaced, explained, and retried.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="landing-dashboard-card p-5">
+                <div className="flex items-center gap-3">
+                  <span className="landing-icon-chip">
+                    <Sparkles className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-text)]">
+                      Designed to feel polished
+                    </p>
+                    <p className="text-sm text-[var(--color-muted)]">
+                      Clear hierarchy, calmer layout, and less UI noise.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { forwardRef, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { Virtuoso, type ListProps, type VirtuosoHandle } from 'react-virtuoso';
-import { ChatMessage } from '@/entities/chat';
+import { ChatFailedReply, ChatMessage } from '@/entities/chat';
 import { cn } from '@/shared/lib/cn';
 
 import type { ChatSendFailureState } from '../lib/sendFailure';
@@ -32,6 +32,7 @@ export function MessagesStack({
   hasOlder = false,
   isLoadingOlder = false,
   sendFailure,
+  failedReply,
   onRetrySend,
 }: {
   messages: ChatMessage[];
@@ -44,6 +45,7 @@ export function MessagesStack({
   hasOlder?: boolean;
   isLoadingOlder?: boolean;
   sendFailure?: ChatSendFailureState | null;
+  failedReply?: ChatFailedReply | null;
   onRetrySend?: () => void | Promise<void>;
 }) {
   const last = messages[messages.length - 1];
@@ -135,6 +137,15 @@ export function MessagesStack({
               canRetry={sendFailure.canRetry}
             />
           ) : null}
+          {!sendFailure && failedReply ? (
+            <ChatSendError
+              message={failedReply.errorMessage}
+              onResend={() => void onRetrySend?.()}
+              disabled={isAssistantLoading}
+              canRetry={failedReply.canRetry}
+              actionLabel="Retry reply"
+            />
+          ) : null}
           {isAssistantLoading ? (
             <div className="flex scroll-mt-5 flex-col overflow-hidden rounded-lg border border-border/80 bg-white/95 shadow-sm">
               {showThinkingLoader ? (
@@ -163,6 +174,7 @@ export function MessagesStack({
     }),
     [
       assistantStreamText,
+      failedReply,
       isAssistantLoading,
       isLoadingOlder,
       showThinkingLoader,
@@ -172,7 +184,7 @@ export function MessagesStack({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col py-7">
+    <div className="flex h-full min-h-0 flex-col">
       <Virtuoso
         ref={virtuosoRef}
         className="min-h-0 flex-1"
@@ -186,7 +198,7 @@ export function MessagesStack({
         itemContent={(index, message) => (
           <div
             key={message.id ?? `${message.role}-${index}-${message.content.slice(0, 32)}`}
-            className="mb-7 flex w-full flex-col"
+            className="mb-7 first:mt-7 flex w-full flex-col"
           >
             <div
               className={cn(
@@ -199,7 +211,7 @@ export function MessagesStack({
                   'px-4 py-2 rounded-md shadow-sm',
                   message.role === 'user'
                     ? 'max-w-[50%] bg-gray-100 text-text'
-                    : 'max-w-[85%] bg-white/95',
+                    : 'max-w-full bg-white/95',
                 )}
               >
                 {message.role === 'assistant' ? (

@@ -15,14 +15,25 @@ export const ChatHistoryMessageDtoSchema = z.object({
   createdAt: z.string().min(1),
 });
 
+export const ChatFailedReplyDtoSchema = z.object({
+  userMessageId: z.string().min(1),
+  userText: z.string().min(1),
+  errorMessage: z.string().min(1),
+  canRetry: z.boolean(),
+  failedAt: z.string().min(1),
+});
+
 export const ChatHistoryPageResponseDtoSchema = z.object({
   messages: z.array(ChatHistoryMessageDtoSchema),
   hasMore: z.boolean(),
+  failedReply: ChatFailedReplyDtoSchema.nullable().optional(),
 });
 
 export const ChatCompleteRequestDtoSchema = z
   .object({
     chatId: z.string().min(1).optional(),
+    userMessageId: z.string().min(1).optional(),
+    requestId: z.string().min(1).optional(),
     messages: z.array(ChatMessageDtoSchema).optional(),
     model: z.string().min(1).optional(),
     temperature: z.number().min(0).max(2).optional(),
@@ -50,6 +61,7 @@ export const GenerateTitleResponseDtoSchema = z.object({
 
 export const ChatCreateRequestDtoSchema = z.object({
   title: z.string().min(1),
+  requestId: z.string().min(1).optional(),
 });
 
 export const ChatCreateResponseDtoSchema = z.object({
@@ -66,6 +78,7 @@ export const ChatAppendMessageRequestDtoSchema = z.object({
   chatId: z.string().min(1),
   role: AiRoleSchema,
   content: z.string().min(1),
+  requestId: z.string().min(1).optional(),
 });
 
 export const ChatRenameRequestDtoSchema = z.object({
@@ -74,6 +87,7 @@ export const ChatRenameRequestDtoSchema = z.object({
 
 export type ChatCompleteRequestDto = z.infer<typeof ChatCompleteRequestDtoSchema>;
 export type ChatHistoryPageResponseDto = z.infer<typeof ChatHistoryPageResponseDtoSchema>;
+export type ChatFailedReplyDto = z.infer<typeof ChatFailedReplyDtoSchema>;
 export type ChatCompleteResponseDto = z.infer<typeof ChatCompleteResponseDtoSchema>;
 export type GenerateTitleRequestDto = z.infer<typeof GenerateTitleRequestDtoSchema>;
 export type GenerateTitleResponseDto = z.infer<typeof GenerateTitleResponseDtoSchema>;
