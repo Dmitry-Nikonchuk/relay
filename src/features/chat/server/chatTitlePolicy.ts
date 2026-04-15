@@ -9,7 +9,7 @@ type InitialTitleResolution =
 
 type GeneratedTitleResolution =
   | { title: string; reason: 'ok' }
-  | { title: string; reason: 'empty' | 'too_long' | 'too_many_words' | 'prompt_echo' };
+  | { title: string; reason: 'empty' | 'too_long' | 'too_many_words' };
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -17,6 +17,62 @@ function normalizeWhitespace(value: string): string {
 
 function normalizeForCompare(value: string): string {
   return normalizeWhitespace(value).toLocaleLowerCase();
+}
+
+function buildTitleFromFirstMessage(userMessage: string): string {
+  const normalized = normalizeWhitespace(userMessage);
+  if (!normalized) {
+    return PLACEHOLDER_CHAT_TITLE;
+  }
+
+  const words = normalized
+    .replace(/[!?.,;:()[\]{}"']/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (words.length === 0) {
+    return PLACEHOLDER_CHAT_TITLE;
+  }
+
+  const title = words.join(' ');
+  return title.length > MAX_GENERATED_TITLE_LENGTH
+    ? title.slice(0, MAX_GENERATED_TITLE_LENGTH).trim()
+    : title;
+}
+
+function truncateGeneratedTitle(title: string): string {
+  const words = normalizeWhitespace(title)
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, MAX_GENERATED_TITLE_WORDS);
+  if (words.length === 0) {
+    return '';
+  }
+  const shortened = words.join(' ');
+  return shortened.length > MAX_GENERATED_TITLE_LENGTH
+    ? shortened.slice(0, MAX_GENERATED_TITLE_LENGTH).trim()
+    : shortened;
+}
+
+function looksLikePromptInstruction(title: string): boolean {
+  const normalized = normalizeForCompare(title);
+  if (!normalized) {
+    return false;
+  }
+
+  const instructionFragments = [
+    'generate a concise chat title',
+    'first user message',
+    'return only the title',
+    'return only the final title',
+    'output must be',
+    'rules:',
+    'chat title',
+    'we need to output',
+  ];
+
+  return instructionFragments.some((fragment) => normalized.includes(fragment));
 }
 
 export function sanitizeCreateChatTitle(rawTitle: string): InitialTitleResolution {
@@ -42,22 +98,28 @@ export function sanitizeGeneratedChatTitle(
 ): GeneratedTitleResolution {
   const normalizedTitle = normalizeWhitespace(generatedTitle);
   if (!normalizedTitle) {
-    return { title: PLACEHOLDER_CHAT_TITLE, reason: 'empty' };
+    return { title: buildTitleFromFirstMessage(userMessage), reason: 'empty' };
   }
 
   if (normalizedTitle.length > MAX_GENERATED_TITLE_LENGTH) {
-    return { title: PLACEHOLDER_CHAT_TITLE, reason: 'too_long' };
+    const shortened = truncateGeneratedTitle(normalizedTitle);
+    if (shortened) {
+      return { title: shortened, reason: 'ok' };
+    }
+    return { title: buildTitleFromFirstMessage(userMessage), reason: 'too_long' };
   }
 
   const wordCount = normalizedTitle.split(' ').filter(Boolean).length;
   if (wordCount > MAX_GENERATED_TITLE_WORDS) {
-    return { title: PLACEHOLDER_CHAT_TITLE, reason: 'too_many_words' };
+    const shortened = truncateGeneratedTitle(normalizedTitle);
+    if (shortened) {
+      return { title: shortened, reason: 'ok' };
+    }
+    return { title: buildTitleFromFirstMessage(userMessage), reason: 'too_many_words' };
   }
 
-  const comparableUserMessage = normalizeForCompare(userMessage);
-  const comparableTitle = normalizeForCompare(normalizedTitle);
-  if (comparableTitle && comparableTitle === comparableUserMessage) {
-    return { title: PLACEHOLDER_CHAT_TITLE, reason: 'prompt_echo' };
+  if (looksLikePromptInstruction(normalizedTitle)) {
+    return { title: buildTitleFromFirstMessage(userMessage), reason: 'empty' };
   }
 
   return { title: normalizedTitle, reason: 'ok' };

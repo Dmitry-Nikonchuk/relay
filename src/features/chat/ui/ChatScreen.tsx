@@ -217,6 +217,21 @@ export function ChatScreen({
     let accumulated = '';
     setMessages((prev) => [...prev, { role: 'assistant', content: '' } as ChatMessage]);
 
+    const titlePromise = runTitle
+      ? (async () => {
+          try {
+            const generated = await chatApi.generateChatTitle(userMessageForTitle, {
+              model: streamModelId,
+            });
+            const updated = await chatApi.updateChatTitle(String(chatId), generated);
+            setChatTitle(updated.title);
+            router.refresh();
+          } catch {
+            // Title is optional
+          }
+        })()
+      : null;
+
     const fullText = await chatApi.streamMessages(
       String(chatId),
       userMessageId,
@@ -238,29 +253,10 @@ export function ChatScreen({
 
     setFailedReply(null);
     router.refresh();
-
-    if (runTitle) {
-      let resolvedTitle: string | null = null;
-      const tryGenerateTitle = async (): Promise<string> => {
-        const generated = await chatApi.generateChatTitle(userMessageForTitle, fullText);
-        const updated = await chatApi.updateChatTitle(String(chatId), generated);
-        return updated.title;
-      };
-
-      try {
-        resolvedTitle = await tryGenerateTitle();
-        if (resolvedTitle === PLACEHOLDER_CHAT_TITLE) {
-          resolvedTitle = await tryGenerateTitle();
-        }
-      } catch {
-        // Title is optional
-      } finally {
-        if (resolvedTitle) {
-          setChatTitle(resolvedTitle);
-        }
-        router.refresh();
-      }
+    if (titlePromise) {
+      await titlePromise;
     }
+    return fullText;
   };
 
   /** @returns whether send + stream completed successfully */

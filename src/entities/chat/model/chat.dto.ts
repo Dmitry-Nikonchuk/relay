@@ -52,7 +52,7 @@ export const ChatCompleteResponseDtoSchema = z.object({
 
 export const GenerateTitleRequestDtoSchema = z.object({
   userMessage: z.string().min(1),
-  assistantMessage: z.string().min(1),
+  model: z.string().min(1).optional(),
 });
 
 export const GenerateTitleResponseDtoSchema = z.object({
