@@ -240,13 +240,25 @@ export function ChatScreen({
     router.refresh();
 
     if (runTitle) {
+      let resolvedTitle: string | null = null;
+      const tryGenerateTitle = async (): Promise<string> => {
+        const generated = await chatApi.generateChatTitle(userMessageForTitle, fullText);
+        const updated = await chatApi.updateChatTitle(String(chatId), generated);
+        return updated.title;
+      };
+
       try {
-        const title = await chatApi.generateChatTitle(userMessageForTitle, fullText);
-        await chatApi.updateChatTitle(String(chatId), title);
-        setChatTitle(title);
-        router.refresh();
+        resolvedTitle = await tryGenerateTitle();
+        if (resolvedTitle === PLACEHOLDER_CHAT_TITLE) {
+          resolvedTitle = await tryGenerateTitle();
+        }
       } catch {
         // Title is optional
+      } finally {
+        if (resolvedTitle) {
+          setChatTitle(resolvedTitle);
+        }
+        router.refresh();
       }
     }
   };

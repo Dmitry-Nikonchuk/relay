@@ -9,12 +9,14 @@ import {
 } from '@/entities/chat';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 import { internalServerErrorResponse, invalidPayloadResponse } from '@/shared/lib/api/errors';
+import { sanitizeCreateChatTitle } from './chatTitlePolicy';
 
 export async function handleCreateChat(req: Request, userId: string) {
   try {
     const body = JSON.parse(await req.text());
     const dto = ChatCreateRequestDtoSchema.parse(body);
     const requestId = dto.requestId ?? createRequestId();
+    const initialTitle = sanitizeCreateChatTitle(dto.title);
 
     const chatId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -23,7 +25,7 @@ export async function handleCreateChat(req: Request, userId: string) {
       {
         query:
           'INSERT INTO chats (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        params: [chatId, userId, dto.title, now, now],
+        params: [chatId, userId, initialTitle.title, now, now],
       },
     ]);
 
@@ -37,10 +39,11 @@ export async function handleCreateChat(req: Request, userId: string) {
       {
         stage: 'chat_creation',
         event: 'chat_created',
+        title_source: initialTitle.source,
       },
     );
 
-    return Response.json({ id: chatId, title: dto.title, createdAt: now });
+    return Response.json({ id: chatId, title: initialTitle.title, createdAt: now });
   } catch (error) {
     if (error instanceof ZodError) {
       return invalidPayloadResponse(treeifyError(error));
