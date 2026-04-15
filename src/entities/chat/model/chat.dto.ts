@@ -60,7 +60,12 @@ export const GenerateTitleResponseDtoSchema = z.object({
 });
 
 export const ChatCreateRequestDtoSchema = z.object({
-  title: z.string().min(1),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .transform((value) => value.replace(/\s+/g, ' ')),
   requestId: z.string().min(1).optional(),
 });
 

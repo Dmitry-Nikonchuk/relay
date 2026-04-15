@@ -17,6 +17,8 @@ import {
 } from '@/shared/lib/guardrails/service';
 import { treeifyError, ZodError } from 'zod';
 import type { AiAssistantMessage } from '@/shared/lib/ai/types';
+import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
+import { sanitizeGeneratedChatTitle } from './chatTitlePolicy';
 
 function getTitleText(message: AiAssistantMessage | null | undefined): string {
   if (!message) {
@@ -39,6 +41,7 @@ function normalizeGeneratedTitle(raw: string): string {
 }
 
 export async function handleGenerateChatTitle(req: Request, userId: string) {
+  const requestId = createRequestId();
   try {
     const body = await req.json();
     const dto = GenerateTitleRequestDtoSchema.parse(body);
@@ -94,9 +97,24 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
       maxTokens: 24,
     });
 
-    const content = normalizeGeneratedTitle(getTitleText(response.choices?.[0]?.message));
-    if (!content) {
-      throw new Error('Title model returned empty content');
+    const generatedTitle = normalizeGeneratedTitle(getTitleText(response.choices?.[0]?.message));
+    const titleResolution = sanitizeGeneratedChatTitle(generatedTitle, dto.userMessage);
+    const content = titleResolution.title;
+    if (titleResolution.reason !== 'ok') {
+      logChatEvent(
+        'warn',
+        {
+          request_id: requestId,
+          user_id: userId,
+          model: AI.model,
+          tier: context.tier,
+        },
+        {
+          stage: 'title_generation',
+          event: 'title_generation_fallback',
+          fallback_reason: titleResolution.reason,
+        },
+      );
     }
 
     await recordGuardrailUsage({
@@ -114,7 +132,19 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
       return invalidPayloadResponse(treeifyError(error));
     }
 
-    console.error('[generateTitle]', error);
+    logChatEvent(
+      'error',
+      {
+        request_id: requestId,
+        user_id: userId,
+        model: AI.model,
+      },
+      {
+        stage: 'title_generation',
+        event: 'title_generation_failed',
+        error: serializeError(error),
+      },
+    );
     return internalServerErrorResponse();
   }
 }
