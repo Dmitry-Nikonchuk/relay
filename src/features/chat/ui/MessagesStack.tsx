@@ -8,7 +8,11 @@ import { cn } from '@/shared/lib/cn';
 import type { ChatSendFailureState } from '../lib/sendFailure';
 import { AssistantReplyLoader } from './AssistantReplyLoader';
 import { ChatSendError } from './ChatSendError';
-import { markdownComponents, markdownRemarkPlugins } from './messageMarkdown';
+import {
+  markdownComponents,
+  markdownRehypePlugins,
+  markdownRemarkPlugins,
+} from './messageMarkdown';
 import ReactMarkdown from 'react-markdown';
 
 /** Horizontal padding on the item list (`data-testid="virtuoso-item-list"`), not on the scroller. */
@@ -156,9 +160,10 @@ export function MessagesStack({
 
               <div className="flex min-h-[min(50vh,28rem)] flex-col px-4 pb-4 pt-4">
                 {assistantStreamText ? (
-                  <div className="max-w-none text-sm text-text">
+                  <div className="chat-markdown max-w-none text-sm text-text">
                     <ReactMarkdown
                       remarkPlugins={markdownRemarkPlugins}
+                      rehypePlugins={markdownRehypePlugins}
                       components={markdownComponents}
                     >
                       {assistantStreamText}
@@ -215,9 +220,10 @@ export function MessagesStack({
                 )}
               >
                 {message.role === 'assistant' ? (
-                  <div className="max-w-none text-sm text-text">
+                  <div className="chat-markdown max-w-none text-sm text-text">
                     <ReactMarkdown
                       remarkPlugins={markdownRemarkPlugins}
+                      rehypePlugins={markdownRehypePlugins}
                       components={markdownComponents}
                     >
                       {message.content}

@@ -54,3 +54,58 @@
     }
   }
 }
+
+@layer components {
+  .chat-markdown .hljs {
+    color: #e2e8f0;
+    background: transparent;
+  }
+
+  .chat-markdown .hljs-comment,
+  .chat-markdown .hljs-quote {
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .chat-markdown .hljs-keyword,
+  .chat-markdown .hljs-selector-tag,
+  .chat-markdown .hljs-literal,
+  .chat-markdown .hljs-section,
+  .chat-markdown .hljs-link {
+    color: #c4b5fd;
+  }
+
+  .chat-markdown .hljs-string,
+  .chat-markdown .hljs-title,
+  .chat-markdown .hljs-name,
+  .chat-markdown .hljs-type,
+  .chat-markdown .hljs-attribute,
+  .chat-markdown .hljs-symbol,
+  .chat-markdown .hljs-bullet,
+  .chat-markdown .hljs-addition {
+    color: #86efac;
+  }
+
+  .chat-markdown .hljs-number,
+  .chat-markdown .hljs-variable,
+  .chat-markdown .hljs-template-variable,
+  .chat-markdown .hljs-tag .hljs-attr,
+  .chat-markdown .hljs-meta,
+  .chat-markdown .hljs-deletion {
+    color: #fca5a5;
+  }
+
+  .chat-markdown .hljs-built_in,
+  .chat-markdown .hljs-title.class_,
+  .chat-markdown .hljs-class .hljs-title {
+    color: #fcd34d;
+  }
+
+  .chat-markdown .hljs-emphasis {
+    font-style: italic;
+  }
+
+  .chat-markdown .hljs-strong {
+    font-weight: 700;
+  }
+}

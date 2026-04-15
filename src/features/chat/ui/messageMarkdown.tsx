@@ -1,4 +1,5 @@
 import type { Components } from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/shared/lib/cn';
 
@@ -21,15 +22,22 @@ export const markdownComponents: Components = {
   ),
   hr: () => <hr className="my-4 border-border" />,
   pre: ({ children }) => (
-    <pre className="mb-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-slate-100 last:mb-0">
+    <pre className="mb-3 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-sm last:mb-0">
       {children}
     </pre>
   ),
   code: ({ className, children, ...props }) => {
-    const isBlock = (props as { inline?: boolean }).inline === false;
+    const maybeInline = (props as { inline?: boolean }).inline;
+    const content = String(children);
+    const isBlock =
+      maybeInline === false || className?.includes('language-') || content.includes('\n');
+
     if (isBlock) {
       return (
-        <code className={cn('font-mono text-sm', className)} {...props}>
+        <code
+          className={cn('block font-mono text-sm leading-6 text-slate-100', className)}
+          {...props}
+        >
           {children}
         </code>
       );
@@ -72,3 +80,4 @@ export const markdownComponents: Components = {
 };
 
 export const markdownRemarkPlugins = [remarkGfm];
+export const markdownRehypePlugins = [rehypeHighlight];
