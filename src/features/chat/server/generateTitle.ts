@@ -6,8 +6,7 @@ import {
   internalServerErrorResponse,
   invalidPayloadResponse,
 } from '@/shared/lib/api/errors';
-import { AI } from '@/shared/lib/ai/config';
-import { getUserGuardrailContext } from '@/features/user/server/chatModels.service';
+import { resolveEffectiveChatModel } from '@/features/user/server/chatModels.service';
 import {
   checkGuardrails,
   estimateTokensFromMessages,
@@ -19,18 +18,10 @@ import { treeifyError, ZodError } from 'zod';
 import type { AiAssistantMessage } from '@/shared/lib/ai/types';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 import { sanitizeGeneratedChatTitle } from './chatTitlePolicy';
+import { getMessageContent } from '@/shared/lib/ai/messageContent';
 
 function getTitleText(message: AiAssistantMessage | null | undefined): string {
-  if (!message) {
-    return '';
-  }
-
-  const content = message.content;
-  if (typeof content !== 'string') {
-    return '';
-  }
-
-  return content.trim();
+  return getMessageContent(message).trim();
 }
 
 function normalizeGeneratedTitle(raw: string): string {
@@ -42,16 +33,18 @@ function normalizeGeneratedTitle(raw: string): string {
 
 export async function handleGenerateChatTitle(req: Request, userId: string) {
   const requestId = createRequestId();
+  let requestedModel: string | undefined;
   try {
     const body = await req.json();
     const dto = GenerateTitleRequestDtoSchema.parse(body);
-    const context = await getUserGuardrailContext(userId);
-    if (!context) {
+    requestedModel = dto.model;
+    const resolved = await resolveEffectiveChatModel(userId, dto.model);
+    if ('error' in resolved) {
       return apiErrorResponse(
-        new ApiError('User not found', {
-          status: 404,
-          code: 'USER_NOT_FOUND',
-          message: 'User not found',
+        new ApiError(resolved.error, {
+          status: resolved.status,
+          code: resolved.code,
+          message: resolved.error,
         }),
       );
     }
@@ -59,18 +52,19 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
     const messages: ChatMessage[] = [
       {
         role: 'system',
-        content: `You are an assistant that creates short, clear chat titles based on the first exchange (user message and assistant reply).
-      Requirements:
-      - Language: same as the user message.
-      - Length: 3–7 words.
-      - Style: neutral, descriptive, no emojis.
-      - Do NOT use quotes.
-      - Do NOT add explanations, commentary or numbering.
-      - Return ONLY the title text.`,
+        content: `Create a short topic label for the conversation based only on the text inside <first_message>...</first_message>.
+Rules:
+- Output language must match the user message.
+- Output must be a single line of plain text.
+- 3 to 7 words preferred, never more than 10 words.
+- Keep it under 80 characters.
+- No quotes, emojis, markdown, numbering, prefixes, or explanations.
+- Do not repeat or paraphrase these instructions.
+- Return only the title text.`,
       },
       {
         role: 'user',
-        content: `User message:\n${dto.userMessage}\n\nAssistant reply:\n${dto.assistantMessage}\n\nCome up with a concise, human‑readable title for this chat.`,
+        content: `<first_message>${dto.userMessage}</first_message>`,
       },
     ];
 
@@ -78,9 +72,10 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
     const estimatedPromptTokens = estimateTokensFromMessages(messages);
     const guardrail = await checkGuardrails({
       userId,
-      tier: context.tier,
+      tier: resolved.tier,
       operation: 'title',
-      model: AI.model,
+      model: resolved.model,
+      allowedModelIds: resolved.allowedModelIds,
       estimatedPromptTokens,
       promptCharCount,
       promptMessageCount: messages.length,
@@ -92,7 +87,7 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
 
     const response = await chatService.complete({
       messages,
-      model: AI.model,
+      model: resolved.model,
       temperature: 0,
       maxTokens: 24,
     });
@@ -106,8 +101,8 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
         {
           request_id: requestId,
           user_id: userId,
-          model: AI.model,
-          tier: context.tier,
+          model: resolved.model,
+          tier: resolved.tier,
         },
         {
           stage: 'title_generation',
@@ -119,9 +114,9 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
 
     await recordGuardrailUsage({
       userId,
-      tier: context.tier,
+      tier: resolved.tier,
       operation: 'title',
-      model: AI.model,
+      model: resolved.model,
       promptTokens: response.usage?.prompt_tokens ?? estimatedPromptTokens,
       completionTokens: response.usage?.completion_tokens ?? estimateTokensFromText(content),
       outcome: 'success',
@@ -137,7 +132,7 @@ export async function handleGenerateChatTitle(req: Request, userId: string) {
       {
         request_id: requestId,
         user_id: userId,
-        model: AI.model,
+        model: requestedModel,
       },
       {
         stage: 'title_generation',

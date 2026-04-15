@@ -117,9 +117,9 @@ export const chatApi = {
     return fullText;
   },
 
-  async generateChatTitle(userMessage: string, assistantMessage: string) {
+  async generateChatTitle(userMessage: string, opts?: { model?: string }) {
     const response = await httpClient.post<GenerateTitleResponseDto>('/api/chat/generateTitle', {
-      body: JSON.stringify({ userMessage, assistantMessage }),
+      body: JSON.stringify({ userMessage, model: opts?.model }),
     });
 
     return response.chatTitle;
