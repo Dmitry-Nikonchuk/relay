@@ -7,8 +7,8 @@ import {
   invalidPayloadResponse,
 } from '@/shared/lib/api/errors';
 import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
-import { ChatAppendMessageRequestDtoSchema } from '@/entities/chat';
-import type { ChatMessage } from '@/entities/chat';
+import { ChatAppendMessageRequestDtoSchema } from '@/features/chat/model';
+import type { ChatMessage } from '@/features/chat/model';
 import { MESSAGE_PAGE_DEFAULT_LIMIT, MESSAGE_PAGE_MAX_LIMIT } from '@/features/chat/lib/constants';
 import { estimateMessageTokenCount, maybeUpdateChatMemory } from './chatMemory';
 import { getLatestFailedReplyForChat, resolvePendingReply } from './pendingReplies';
@@ -299,7 +299,7 @@ export async function handleAppendMessage(req: Request, userId: string) {
       },
     );
 
-    return Response.json({ id: persisted.id });
+    return Response.json({ id: persisted.id, createdAt: persisted.createdAt });
   } catch (error) {
     if (error instanceof ZodError) {
       return invalidPayloadResponse(treeifyError(error));

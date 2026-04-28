@@ -1,4 +1,4 @@
-import type { ChatFailedReply } from '@/entities/chat';
+import type { ChatFailedReply } from '@/features/chat/model';
 import { execute, queryOne } from '@/shared/lib/db/client';
 
 type PendingReplyRow = {
@@ -9,6 +9,11 @@ type PendingReplyRow = {
   failure_message: string;
   updated_at: string;
   resolved_at: string | null;
+};
+
+type LatestMessageRow = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
 };
 
 function canRetryFromFailureCode(code: string): boolean {
@@ -94,6 +99,20 @@ export async function getLatestFailedReplyForChat(
   );
 
   if (!row) {
+    return null;
+  }
+
+  const latestMessage = await queryOne<LatestMessageRow>(
+    `SELECT id, role
+     FROM messages
+     WHERE chat_id = ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [chatId],
+  );
+
+  // Only surface retry UI when the failed user message is still the latest persisted message.
+  if (!latestMessage || latestMessage.id !== row.user_message_id || latestMessage.role !== 'user') {
     return null;
   }
 

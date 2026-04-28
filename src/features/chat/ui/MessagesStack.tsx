@@ -1,8 +1,8 @@
 'use client';
 
-import { forwardRef, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { forwardRef, useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef } from 'react';
 import { Virtuoso, type ListProps, type VirtuosoHandle } from 'react-virtuoso';
-import { ChatFailedReply, ChatMessage } from '@/entities/chat';
+import { ChatFailedReply, ChatMessage } from '@/features/chat/model';
 import { cn } from '@/shared/lib/cn';
 
 import type { ChatSendFailureState } from '../lib/sendFailure';
@@ -66,6 +66,8 @@ export function MessagesStack({
 
   const assistantStreamText =
     last?.role === 'assistant' && last.content.trim() !== '' ? last.content : '';
+  // Markdown is one of the heaviest parts of a streamed reply, so defer it slightly to keep input/scroll responsive.
+  const deferredAssistantStreamText = useDeferredValue(assistantStreamText);
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const prevLoadingRef = useRef(false);
@@ -159,14 +161,14 @@ export function MessagesStack({
               ) : null}
 
               <div className="flex min-h-[min(50vh,28rem)] flex-col px-4 pb-4 pt-4">
-                {assistantStreamText ? (
+                {deferredAssistantStreamText ? (
                   <div className="chat-markdown max-w-none text-sm text-text">
                     <ReactMarkdown
                       remarkPlugins={markdownRemarkPlugins}
                       rehypePlugins={markdownRehypePlugins}
                       components={markdownComponents}
                     >
-                      {assistantStreamText}
+                      {deferredAssistantStreamText}
                     </ReactMarkdown>
                   </div>
                 ) : null}
@@ -178,7 +180,7 @@ export function MessagesStack({
       ),
     }),
     [
-      assistantStreamText,
+      deferredAssistantStreamText,
       failedReply,
       isAssistantLoading,
       isLoadingOlder,

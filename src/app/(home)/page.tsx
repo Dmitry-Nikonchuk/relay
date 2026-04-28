@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
+    // This page stays static because it does not depend on request cookies, auth, or database data.
     <div className={`${manrope.className} landing-bg min-h-screen text-[var(--color-text)]`}>
       <LandingHeader />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/shared/ui/Button';
+import { ClientButton } from '@/shared/ui/Button';
 
 type Props = {
   message: string;
@@ -25,7 +25,7 @@ export function ChatSendError({
       <p className="leading-relaxed">{message}</p>
       {canRetry ? (
         <div className="mt-3">
-          <Button
+          <ClientButton
             type="button"
             variant="secondary"
             size="sm"
@@ -33,7 +33,7 @@ export function ChatSendError({
             onClick={onResend}
           >
             {actionLabel}
-          </Button>
+          </ClientButton>
         </div>
       ) : null}
     </div>

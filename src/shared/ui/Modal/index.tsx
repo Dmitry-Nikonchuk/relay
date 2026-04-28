@@ -12,7 +12,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import { cn } from '@/shared/lib/cn';
-import { Button } from '@/shared/ui/Button';
+import { ClientButton } from '@/shared/ui/Button';
 import { X } from 'lucide-react';
 
 const Z_INDEX = 1100;
@@ -239,20 +239,26 @@ export function ModalConfirm({
       size="sm"
       footer={
         <>
-          <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={loading}>
+          <ClientButton
+            variant="secondary"
+            size="sm"
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+          >
             {cancelLabel}
-          </Button>
+          </ClientButton>
           {confirmVariant === 'danger' ? (
-            <Button
+            <ClientButton
               variant="danger"
               type="button"
               onClick={() => void handleConfirm()}
               disabled={loading}
             >
               {confirmLabel}
-            </Button>
+            </ClientButton>
           ) : (
-            <Button
+            <ClientButton
               variant="primary"
               size="sm"
               type="button"
@@ -260,7 +266,7 @@ export function ModalConfirm({
               disabled={loading}
             >
               {confirmLabel}
-            </Button>
+            </ClientButton>
           )}
         </>
       }

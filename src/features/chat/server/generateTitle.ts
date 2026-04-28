@@ -1,4 +1,4 @@
-import { ChatMessage, GenerateTitleRequestDtoSchema } from '@/entities/chat';
+import { ChatMessage, GenerateTitleRequestDtoSchema } from '@/features/chat/model';
 import { chatService } from '@/shared/lib/ai/chat.service';
 import {
   ApiError,
@@ -19,6 +19,7 @@ import type { AiAssistantMessage } from '@/shared/lib/ai/types';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 import { sanitizeGeneratedChatTitle } from './chatTitlePolicy';
 import { getMessageContent } from '@/shared/lib/ai/messageContent';
+import { AI } from '@/shared/lib/ai/config';
 
 function getTitleText(message: AiAssistantMessage | null | undefined): string {
   return getMessageContent(message).trim();
@@ -33,12 +34,10 @@ function normalizeGeneratedTitle(raw: string): string {
 
 export async function handleGenerateChatTitle(req: Request, userId: string) {
   const requestId = createRequestId();
-  let requestedModel: string | undefined;
   try {
     const body = await req.json();
     const dto = GenerateTitleRequestDtoSchema.parse(body);
-    requestedModel = dto.model;
-    const resolved = await resolveEffectiveChatModel(userId, dto.model);
+    const resolved = await resolveEffectiveChatModel(userId, undefined);
     if ('error' in resolved) {
       return apiErrorResponse(
         new ApiError(resolved.error, {
@@ -74,8 +73,7 @@ Rules:
       userId,
       tier: resolved.tier,
       operation: 'title',
-      model: resolved.model,
-      allowedModelIds: resolved.allowedModelIds,
+      model: AI.titleModel,
       estimatedPromptTokens,
       promptCharCount,
       promptMessageCount: messages.length,
@@ -87,7 +85,7 @@ Rules:
 
     const response = await chatService.complete({
       messages,
-      model: resolved.model,
+      model: AI.titleModel,
       temperature: 0,
       maxTokens: 24,
     });
@@ -101,7 +99,7 @@ Rules:
         {
           request_id: requestId,
           user_id: userId,
-          model: resolved.model,
+          model: AI.titleModel,
           tier: resolved.tier,
         },
         {
@@ -116,7 +114,7 @@ Rules:
       userId,
       tier: resolved.tier,
       operation: 'title',
-      model: resolved.model,
+      model: AI.titleModel,
       promptTokens: response.usage?.prompt_tokens ?? estimatedPromptTokens,
       completionTokens: response.usage?.completion_tokens ?? estimateTokensFromText(content),
       outcome: 'success',
@@ -132,7 +130,7 @@ Rules:
       {
         request_id: requestId,
         user_id: userId,
-        model: requestedModel,
+        model: AI.titleModel,
       },
       {
         stage: 'title_generation',

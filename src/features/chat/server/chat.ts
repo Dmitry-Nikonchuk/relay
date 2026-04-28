@@ -1,15 +1,14 @@
 import { ZodError, treeifyError } from 'zod';
-
 import { batchExecute, execute, queryOne, queryAll } from '@/shared/lib/db/client';
 import {
   ChatCreateRequestDtoSchema,
   ChatUpdateTitleRequestDtoSchema,
   ChatRenameRequestDtoSchema,
   type ChatListRow,
-} from '@/entities/chat';
+} from '@/features/chat/model';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 import { internalServerErrorResponse, invalidPayloadResponse } from '@/shared/lib/api/errors';
-import { sanitizeCreateChatTitle } from './chatTitlePolicy';
+import { sanitizeCreateChatTitle, sanitizeUpdatedChatTitle } from './chatTitlePolicy';
 
 export async function handleCreateChat(req: Request, userId: string) {
   try {
@@ -82,22 +81,23 @@ export async function handleUpdateChatTitle(req: Request, chatId: string, userId
     const body = await req.json();
     const dto = ChatUpdateTitleRequestDtoSchema.parse(body);
 
-    const row = await queryOne<{ id: string }>(
-      'SELECT id FROM chats WHERE id = ? AND user_id = ?',
+    const row = await queryOne<{ id: string; title: string }>(
+      'SELECT id, title FROM chats WHERE id = ? AND user_id = ?',
       [chatId, userId],
     );
     if (!row) {
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
+    const nextTitle = sanitizeUpdatedChatTitle(dto.title, row.title);
     const now = new Date().toISOString();
     await execute('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?', [
-      dto.title,
+      nextTitle.title,
       now,
       chatId,
     ]);
 
-    return Response.json({ id: chatId, title: dto.title, updatedAt: now });
+    return Response.json({ id: chatId, title: nextTitle.title, updatedAt: now });
   } catch (error) {
     if (error instanceof ZodError) {
       return Response.json(
@@ -143,22 +143,23 @@ export async function handleRenameChat(req: Request, chatId: string, userId: str
     const body = await req.json();
     const dto = ChatRenameRequestDtoSchema.parse(body);
 
-    const row = await queryOne<{ id: string }>(
-      'SELECT id FROM chats WHERE id = ? AND user_id = ?',
+    const row = await queryOne<{ id: string; title: string }>(
+      'SELECT id, title FROM chats WHERE id = ? AND user_id = ?',
       [chatId, userId],
     );
     if (!row) {
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
+    const nextTitle = sanitizeUpdatedChatTitle(dto.title, row.title);
     const now = new Date().toISOString();
     await execute('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?', [
-      dto.title,
+      nextTitle.title,
       now,
       chatId,
     ]);
 
-    return Response.json({ id: chatId, title: dto.title, updatedAt: now });
+    return Response.json({ id: chatId, title: nextTitle.title, updatedAt: now });
   } catch (error) {
     console.error(error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });

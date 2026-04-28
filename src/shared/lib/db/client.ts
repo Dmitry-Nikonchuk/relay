@@ -36,7 +36,7 @@ export async function execute(query: string, params: unknown[] = [], db?: D1Data
     .run();
 }
 
-/** Атомарное выполнение нескольких запросов (D1 не поддерживает SQL `BEGIN`/`COMMIT`). */
+/** Atomic execution of multiple queries (D1 does not support SQL `BEGIN`/`COMMIT`). */
 export async function batchExecute(
   statements: Array<{ query: string; params: unknown[] }>,
   db?: D1Database,

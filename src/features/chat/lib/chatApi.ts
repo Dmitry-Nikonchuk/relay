@@ -13,12 +13,15 @@ import {
   ChatCreateResponseDto,
   ChatHistoryPageResponseDto,
   GenerateTitleResponseDto,
-} from '@/entities/chat';
+} from '@/features/chat/model';
 import type { UserChatModelsResponseDto } from '@/features/user/model/userChatModels.types';
 
 export const chatApi = {
   async fetchUserChatModels(): Promise<UserChatModelsResponseDto> {
-    return httpClient.get<UserChatModelsResponseDto>('/api/user/chat-models');
+    // These APIs are user-specific, so each read should bypass any fetch cache layer.
+    return httpClient.get<UserChatModelsResponseDto>('/api/user/chat-models', {
+      cache: 'no-store',
+    });
   },
 
   async patchUserChatModel(model: string): Promise<UserChatModelsResponseDto> {
@@ -28,7 +31,7 @@ export const chatApi = {
   },
 
   async fetchChats(): Promise<Chat[]> {
-    const rows = await httpClient.get<ChatListRow[]>('/api/chat');
+    const rows = await httpClient.get<ChatListRow[]>('/api/chat', { cache: 'no-store' });
     return rows.map(mapChatListRowToChat);
   },
 
@@ -49,6 +52,7 @@ export const chatApi = {
   ): Promise<string> {
     const res = await httpClient.stream('/api/chat/stream', {
       method: 'POST',
+      cache: 'no-store',
       body: JSON.stringify({
         chatId,
         userMessageId,
@@ -143,7 +147,9 @@ export const chatApi = {
       qs.set('beforeCreatedAt', opts.before.createdAt);
       qs.set('beforeId', opts.before.id);
     }
-    return httpClient.get<ChatHistoryPageResponseDto>(`/api/chat/history?${qs.toString()}`);
+    return httpClient.get<ChatHistoryPageResponseDto>(`/api/chat/history?${qs.toString()}`, {
+      cache: 'no-store',
+    });
   },
 
   async appendMessage(
@@ -152,7 +158,7 @@ export const chatApi = {
     content: string,
     opts?: { requestId?: string },
   ) {
-    return httpClient.post<{ id: string }>('/api/chat/history', {
+    return httpClient.post<{ id: string; createdAt: string }>('/api/chat/history', {
       body: JSON.stringify({ chatId, role, content, requestId: opts?.requestId }),
     });
   },

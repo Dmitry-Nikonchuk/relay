@@ -1,11 +1,14 @@
-import { mapChatListRowToChat } from '@/entities/chat';
-import type { ChatFailedReply, ChatMessage } from '@/entities/chat';
+import { mapChatListRowToChat } from '@/features/chat/model';
+import type { ChatFailedReply, ChatMessage } from '@/features/chat/model';
 import { ChatScreen } from '@/features/chat';
 import { listChatsForUser } from '@/features/chat/server/chat';
 import { MESSAGE_PAGE_DEFAULT_LIMIT } from '@/features/chat/lib/constants';
 import { listMessagesLatestPage } from '@/features/chat/server/messages';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+
+// This page is per-user and seeds the client chat app with the latest server snapshot.
+export const dynamic = 'force-dynamic';
 
 type PageProps = {
   searchParams: Promise<{ chatId?: string }>;

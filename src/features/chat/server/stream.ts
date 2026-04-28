@@ -1,6 +1,6 @@
 import { ZodError, treeifyError } from 'zod';
 
-import { ChatCompleteRequestDtoSchema } from '@/entities/chat';
+import { ChatCompleteRequestDtoSchema } from '@/features/chat/model';
 import { chatService } from '@/shared/lib/ai/chat.service';
 import {
   ApiError,

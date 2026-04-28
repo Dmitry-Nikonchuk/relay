@@ -1,5 +1,5 @@
-import type { ChatMessage } from '@/entities/chat';
-import type { ChatFailedReply } from '@/entities/chat';
+import type { ChatMessage } from '@/features/chat/model';
+import type { ChatFailedReply } from '@/features/chat/model';
 import { HttpError } from '@/shared/lib/http/client';
 
 export type ChatSendFailureState = {
@@ -11,6 +11,8 @@ export type ChatSendFailureState = {
   /** Chat id for stream/append; null if setup did not complete. */
   chatId: string | null;
   userMessageId?: string | null;
+  /** Optimistic bubble id so retries can promote the existing draft instead of duplicating it. */
+  tempMessageId?: string | null;
   /** First message in a new chat — generate title after a successful stream retry. */
   generateTitleAfterStream?: boolean;
 };

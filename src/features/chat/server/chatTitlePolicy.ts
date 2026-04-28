@@ -75,6 +75,10 @@ function looksLikePromptInstruction(title: string): boolean {
   return instructionFragments.some((fragment) => normalized.includes(fragment));
 }
 
+function stripWrappingQuotes(value: string): string {
+  return value.replace(/^["'“”«»]+|["'“”«»]+$/g, '').trim();
+}
+
 export function sanitizeCreateChatTitle(rawTitle: string): InitialTitleResolution {
   const normalized = normalizeWhitespace(rawTitle);
   const requestedIsPlaceholder =
@@ -123,4 +127,23 @@ export function sanitizeGeneratedChatTitle(
   }
 
   return { title: normalizedTitle, reason: 'ok' };
+}
+
+export function sanitizeUpdatedChatTitle(
+  rawTitle: string,
+  currentTitle: string,
+): { title: string; reason: 'ok' | 'empty' | 'prompt_instruction' } {
+  const normalizedTitle = stripWrappingQuotes(normalizeWhitespace(rawTitle));
+  if (!normalizedTitle) {
+    return { title: currentTitle, reason: 'empty' };
+  }
+
+  if (looksLikePromptInstruction(normalizedTitle)) {
+    return { title: currentTitle, reason: 'prompt_instruction' };
+  }
+
+  return {
+    title: normalizedTitle.slice(0, MAX_GENERATED_TITLE_LENGTH).trim(),
+    reason: 'ok',
+  };
 }

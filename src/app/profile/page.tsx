@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description: 'Your Relay account and sign-in details.',
 };
 
+// Profile is user-private, so the HTML must be rendered against the current session on each request.
+export const dynamic = 'force-dynamic';
+
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user) {

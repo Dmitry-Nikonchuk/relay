@@ -3,8 +3,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import './(home)/marketing.css';
 
-import { AppProviders } from './providers';
-
 export const metadata: Metadata = {
   title: 'Relay',
   description: 'AI chat',
@@ -17,9 +15,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <AppProviders>{children}</AppProviders>
-      </body>
+      {/* Keep the root layout server-only so public pages can stay as lean as possible. */}
+      <body>{children}</body>
     </html>
   );
 }

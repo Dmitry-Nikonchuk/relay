@@ -10,6 +10,9 @@ import { AuthDivider } from '@/shared/ui/AuthDivider';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 
+// This route must stay dynamic because it checks the live session and may redirect immediately.
+export const dynamic = 'force-dynamic';
+
 const sora = Sora({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],

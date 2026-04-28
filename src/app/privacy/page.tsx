@@ -3,6 +3,9 @@ import type { Metadata } from 'next';
 import { LEGAL_LAST_UPDATED, SERVICE_NAME, SERVICE_OPERATOR } from '@/shared/config/legal';
 import { LegalPage, LegalSection } from '@/shared/ui/LegalPage';
 
+// Legal copy is shared by every visitor, so ISR gives us static HTML with occasional refreshes.
+export const revalidate = 3600 * 24; // 24 hours
+
 export const metadata: Metadata = {
   title: 'Relay | Privacy Policy',
   description: 'How Relay collects, uses, stores, and shares personal data.',

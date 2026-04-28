@@ -6,6 +6,11 @@ export const AI = {
     process.env.OPENROUTER_SUMMARY_MODEL ??
     process.env.OPENROUTER_MODEL ??
     'liquid/lfm-2.5-1.2b-thinking:free',
+  titleModel:
+    process.env.OPENROUTER_TITLE_MODEL ??
+    process.env.OPENROUTER_SUMMARY_MODEL ??
+    process.env.OPENROUTER_MODEL ??
+    'liquid/lfm-2.5-1.2b-thinking:free',
 };
 
 export function assertAiConfig() {

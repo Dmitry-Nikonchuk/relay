@@ -1,4 +1,4 @@
-import type { ChatMemoryJson, ChatMessage } from '@/entities/chat';
+import type { ChatMemoryJson, ChatMessage } from '@/features/chat/model';
 import type { AiMessage } from '@/shared/lib/ai/types';
 
 function clampText(value: string, maxLength: number): string {

@@ -7,7 +7,7 @@ import {
   type ChatMemoryJson,
   type ChatMemoryRow,
   type ChatMessage,
-} from '@/entities/chat';
+} from '@/features/chat/model';
 import {
   RECENT_CONTEXT_MESSAGES,
   SUMMARY_CHUNK_MESSAGES,

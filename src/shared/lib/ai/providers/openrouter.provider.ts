@@ -111,6 +111,8 @@ export class OpenRouterProvider implements AiProvider {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        // LLM requests are always request-scoped; never let them fall into a reusable fetch cache.
+        cache: 'no-store',
       });
 
       if (res.ok) {
