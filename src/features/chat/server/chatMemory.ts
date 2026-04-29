@@ -14,6 +14,7 @@ import {
   SUMMARY_TRIGGER_MESSAGES,
   SUMMARY_TRIGGER_TOKENS,
 } from '@/features/chat/lib/constants';
+import { createUserChatCipher } from '@/shared/lib/security/chatEncryption';
 import { chatService } from '@/shared/lib/ai/chat.service';
 import { AI } from '@/shared/lib/ai/config';
 import { AiProviderError } from '@/shared/lib/ai/errors';
@@ -67,6 +68,20 @@ function rowToChatMessage(row: MessageRow): ChatMessage {
     content: row.content,
     createdAt: row.created_at,
   };
+}
+
+async function decryptMessageRows(
+  rows: MessageRow[],
+  userId: string,
+  chatId: string,
+): Promise<MessageRow[]> {
+  const cipher = await createUserChatCipher(userId);
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      content: await cipher.decrypt(row.content, 'message_content', chatId),
+    })),
+  );
 }
 
 function chunkMessages(messages: MessageRow[], chunkSize: number): MessageRow[][] {
@@ -137,7 +152,11 @@ async function assertChatOwnedByUser(chatId: string, userId: string): Promise<bo
   return row != null;
 }
 
-async function getRecentMessages(chatId: string, limit: number): Promise<ChatMessage[]> {
+async function getRecentMessages(
+  chatId: string,
+  userId: string,
+  limit: number,
+): Promise<ChatMessage[]> {
   const rows = await queryAll<MessageRow>(
     `SELECT id, role, content, created_at
      FROM messages
@@ -147,17 +166,18 @@ async function getRecentMessages(chatId: string, limit: number): Promise<ChatMes
     [chatId, limit],
   );
 
-  return rows.reverse().map(rowToChatMessage);
+  const decryptedRows = await decryptMessageRows(rows, userId, chatId);
+  return decryptedRows.reverse().map(rowToChatMessage);
 }
 
-async function getMemoryFromBackfill(chatId: string): Promise<ChatMemory | null> {
+async function getMemoryFromBackfill(chatId: string, userId: string): Promise<ChatMemory | null> {
   const existing = await queryOne<ChatMemoryRow>(
     'SELECT chat_id, summary_text, summary_json, last_summarized_message_id, updated_at FROM chat_memory WHERE chat_id = ?',
     [chatId],
   );
 
   if (existing) {
-    return mapChatMemoryRowToChatMemory(existing);
+    return mapChatMemoryRowToChatMemory(existing, userId);
   }
 
   const legacySummary = await queryOne<ChatSummaryRow>(
@@ -169,11 +189,27 @@ async function getMemoryFromBackfill(chatId: string): Promise<ChatMemory | null>
     return null;
   }
 
+  const cipher = await createUserChatCipher(userId);
   const now = new Date().toISOString();
+  const summaryText = await cipher.decrypt(
+    legacySummary.content,
+    'chat_memory_summary_text',
+    chatId,
+  );
   const summaryJson = {
     ...createEmptyChatMemoryJson(),
-    summary_text: legacySummary.content,
+    summary_text: summaryText,
   };
+  const encryptedSummaryText = await cipher.encrypt(
+    summaryText,
+    'chat_memory_summary_text',
+    chatId,
+  );
+  const encryptedSummaryJson = await cipher.encrypt(
+    stringifyChatMemoryJson(summaryJson),
+    'chat_memory_summary_json',
+    chatId,
+  );
 
   await execute(
     `INSERT OR IGNORE INTO chat_memory
@@ -181,8 +217,8 @@ async function getMemoryFromBackfill(chatId: string): Promise<ChatMemory | null>
      VALUES (?, ?, ?, ?, ?)`,
     [
       chatId,
-      legacySummary.content,
-      stringifyChatMemoryJson(summaryJson),
+      encryptedSummaryText,
+      encryptedSummaryJson,
       legacySummary.last_covered_message_id,
       now,
     ],
@@ -193,21 +229,23 @@ async function getMemoryFromBackfill(chatId: string): Promise<ChatMemory | null>
     [chatId],
   );
 
-  return inserted ? mapChatMemoryRowToChatMemory(inserted) : null;
+  return inserted ? mapChatMemoryRowToChatMemory(inserted, userId) : null;
 }
 
 async function listUnsummarizedMessages(
   chatId: string,
   lastSummarizedMessageId: string | null,
+  userId: string,
 ): Promise<MessageRow[]> {
   if (!lastSummarizedMessageId) {
-    return queryAll<MessageRow>(
+    const rows = await queryAll<MessageRow>(
       `SELECT id, role, content, created_at, token_count
        FROM messages
        WHERE chat_id = ?
        ORDER BY created_at ASC, id ASC`,
       [chatId],
     );
+    return decryptMessageRows(rows, userId, chatId);
   }
 
   const cursor = await queryOne<MessageCursorRow>(
@@ -216,16 +254,17 @@ async function listUnsummarizedMessages(
   );
 
   if (!cursor) {
-    return queryAll<MessageRow>(
+    const rows = await queryAll<MessageRow>(
       `SELECT id, role, content, created_at, token_count
        FROM messages
        WHERE chat_id = ?
        ORDER BY created_at ASC, id ASC`,
       [chatId],
     );
+    return decryptMessageRows(rows, userId, chatId);
   }
 
-  return queryAll<MessageRow>(
+  const rows = await queryAll<MessageRow>(
     `SELECT id, role, content, created_at, token_count
      FROM messages
      WHERE chat_id = ?
@@ -233,6 +272,7 @@ async function listUnsummarizedMessages(
      ORDER BY created_at ASC, id ASC`,
     [chatId, cursor.created_at, cursor.created_at, cursor.id],
   );
+  return decryptMessageRows(rows, userId, chatId);
 }
 
 async function summarizeDeltaChunk(
@@ -296,8 +336,8 @@ export async function buildChatContext(
   }
 
   const [memory, recentMessages] = await Promise.all([
-    getMemoryFromBackfill(chatId),
-    getRecentMessages(chatId, RECENT_CONTEXT_MESSAGES),
+    getMemoryFromBackfill(chatId, userId),
+    getRecentMessages(chatId, userId, RECENT_CONTEXT_MESSAGES),
   ]);
 
   const normalizedUserMessage = currentUserMessage?.trim();
@@ -341,10 +381,11 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
     return;
   }
 
-  const memory = await getMemoryFromBackfill(chatId);
+  const memory = await getMemoryFromBackfill(chatId, userId);
   const unsummarized = await listUnsummarizedMessages(
     chatId,
     memory?.lastSummarizedMessageId ?? null,
+    userId,
   );
 
   if (unsummarized.length < 1) {
@@ -390,6 +431,17 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
 
     const lastProcessed = unsummarized[unsummarized.length - 1];
     const now = new Date().toISOString();
+    const cipher = await createUserChatCipher(userId);
+    const encryptedSummaryText = await cipher.encrypt(
+      workingSummary.summary_text,
+      'chat_memory_summary_text',
+      chatId,
+    );
+    const encryptedSummaryJson = await cipher.encrypt(
+      stringifyChatMemoryJson(workingSummary),
+      'chat_memory_summary_json',
+      chatId,
+    );
 
     await execute(
       `INSERT INTO chat_memory (chat_id, summary_text, summary_json, last_summarized_message_id, updated_at)
@@ -399,13 +451,7 @@ export async function maybeUpdateChatMemory(chatId: string, userId: string): Pro
          summary_json = excluded.summary_json,
          last_summarized_message_id = excluded.last_summarized_message_id,
          updated_at = excluded.updated_at`,
-      [
-        chatId,
-        workingSummary.summary_text,
-        stringifyChatMemoryJson(workingSummary),
-        lastProcessed.id,
-        now,
-      ],
+      [chatId, encryptedSummaryText, encryptedSummaryJson, lastProcessed.id, now],
     );
 
     console.info('[chat-memory] summary update completed', {

@@ -1,5 +1,6 @@
 import type { ChatFailedReply } from '@/features/chat/model';
 import { execute, queryOne } from '@/shared/lib/db/client';
+import { createUserChatCipher } from '@/shared/lib/security/chatEncryption';
 
 type PendingReplyRow = {
   chat_id: string;
@@ -36,6 +37,7 @@ async function assertChatOwnedByUser(chatId: string, userId: string): Promise<bo
 
 export async function upsertPendingReply(params: {
   chatId: string;
+  userId: string;
   userMessageId: string;
   userMessageText: string;
   model?: string;
@@ -45,6 +47,12 @@ export async function upsertPendingReply(params: {
   requestId: string;
 }): Promise<void> {
   const now = new Date().toISOString();
+  const cipher = await createUserChatCipher(params.userId);
+  const encryptedUserMessageText = await cipher.encrypt(
+    params.userMessageText,
+    'pending_reply_user_message_text',
+    params.chatId,
+  );
   await execute(
     `INSERT INTO chat_pending_replies
       (id, chat_id, user_message_id, user_message_text, model, failure_stage, failure_code, failure_message, request_id, created_at, updated_at, resolved_at)
@@ -61,7 +69,7 @@ export async function upsertPendingReply(params: {
       crypto.randomUUID(),
       params.chatId,
       params.userMessageId,
-      params.userMessageText,
+      encryptedUserMessageText,
       params.model ?? null,
       params.failureStage,
       params.failureCode,
@@ -116,9 +124,15 @@ export async function getLatestFailedReplyForChat(
     return null;
   }
 
+  const cipher = await createUserChatCipher(userId);
+
   return {
     userMessageId: row.user_message_id,
-    userText: row.user_message_text,
+    userText: await cipher.decrypt(
+      row.user_message_text,
+      'pending_reply_user_message_text',
+      row.chat_id,
+    ),
     errorMessage: row.failure_message,
     canRetry: canRetryFromFailureCode(row.failure_code),
     failedAt: row.updated_at,

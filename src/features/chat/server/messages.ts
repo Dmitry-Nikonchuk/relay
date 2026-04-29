@@ -10,6 +10,7 @@ import { execute, queryAll, queryOne } from '@/shared/lib/db/client';
 import { ChatAppendMessageRequestDtoSchema } from '@/features/chat/model';
 import type { ChatMessage } from '@/features/chat/model';
 import { MESSAGE_PAGE_DEFAULT_LIMIT, MESSAGE_PAGE_MAX_LIMIT } from '@/features/chat/lib/constants';
+import { createUserChatCipher } from '@/shared/lib/security/chatEncryption';
 import { estimateMessageTokenCount, maybeUpdateChatMemory } from './chatMemory';
 import { getLatestFailedReplyForChat, resolvePendingReply } from './pendingReplies';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
@@ -36,6 +37,20 @@ function rowToChatMessage(row: MessageRow): ChatMessage {
     content: row.content,
     createdAt: row.created_at,
   };
+}
+
+async function decryptMessageRows(
+  rows: MessageRow[],
+  userId: string,
+  chatId: string,
+): Promise<MessageRow[]> {
+  const cipher = await createUserChatCipher(userId);
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      content: await cipher.decrypt(row.content, 'message_content', chatId),
+    })),
+  );
 }
 
 function clampLimit(raw: number): number {
@@ -90,7 +105,8 @@ export async function listMessagesLatestPage(
 
   const hasMore = rows.length > lim;
   const slice = hasMore ? rows.slice(0, lim) : rows;
-  const asc = [...slice].reverse();
+  const decrypted = await decryptMessageRows(slice, userId, chatId);
+  const asc = [...decrypted].reverse();
 
   return {
     messages: asc.map(rowToChatMessage),
@@ -125,7 +141,8 @@ export async function listMessagesPageBefore(
 
   const hasMore = rows.length > lim;
   const slice = hasMore ? rows.slice(0, lim) : rows;
-  const asc = [...slice].reverse();
+  const decrypted = await decryptMessageRows(slice, userId, chatId);
+  const asc = [...decrypted].reverse();
 
   return {
     messages: asc.map(rowToChatMessage),
@@ -144,12 +161,22 @@ export async function getUserMessageForChat(
     return null;
   }
 
-  return queryOne<{ id: string; content: string }>(
+  const row = await queryOne<{ id: string; content: string }>(
     `SELECT id, content
      FROM messages
      WHERE id = ? AND chat_id = ? AND role = 'user'`,
     [userMessageId, chatId],
   );
+
+  if (!row) {
+    return null;
+  }
+
+  const cipher = await createUserChatCipher(userId);
+  return {
+    ...row,
+    content: await cipher.decrypt(row.content, 'message_content', chatId),
+  };
 }
 
 export async function persistChatMessage(params: {
@@ -171,12 +198,14 @@ export async function persistChatMessage(params: {
   const messageId = crypto.randomUUID();
   const now = new Date().toISOString();
   const tokenCount = estimateMessageTokenCount(params.content);
+  const cipher = await createUserChatCipher(params.userId);
+  const encryptedContent = await cipher.encrypt(params.content, 'message_content', params.chatId);
 
   await execute(
     `INSERT INTO messages
       (id, chat_id, role, content, created_at, token_count, metadata)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [messageId, params.chatId, params.role, params.content, now, tokenCount, null],
+    [messageId, params.chatId, params.role, encryptedContent, now, tokenCount, null],
   );
   await execute('UPDATE chats SET updated_at = ? WHERE id = ?', [now, params.chatId]);
 
@@ -206,12 +235,13 @@ export async function getMessagesForModelCompletion(
     return null;
   }
 
-  const rows = await queryAll<{ role: ChatMessage['role']; content: string }>(
-    'SELECT role, content FROM messages WHERE chat_id = ? ORDER BY created_at ASC, id ASC',
+  const rows = await queryAll<MessageRow>(
+    'SELECT id, role, content, created_at FROM messages WHERE chat_id = ? ORDER BY created_at ASC, id ASC',
     [chatId],
   );
 
-  return rows as ChatMessage[];
+  const decrypted = await decryptMessageRows(rows, userId, chatId);
+  return decrypted.map(rowToChatMessage);
 }
 
 export async function handleGetMessages(req: Request, userId: string) {

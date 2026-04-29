@@ -211,6 +211,7 @@ export async function handleStream(req: Request, userId: string) {
 
       await upsertPendingReply({
         chatId,
+        userId,
         userMessageId: userMessage.id,
         userMessageText: userMessage.content,
         model: params.model,

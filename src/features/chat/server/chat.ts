@@ -8,6 +8,7 @@ import {
 } from '@/features/chat/model';
 import { createRequestId, logChatEvent, serializeError } from '@/shared/lib/logging/chatLogger';
 import { internalServerErrorResponse, invalidPayloadResponse } from '@/shared/lib/api/errors';
+import { createUserChatCipher } from '@/shared/lib/security/chatEncryption';
 import { sanitizeCreateChatTitle, sanitizeUpdatedChatTitle } from './chatTitlePolicy';
 
 export async function handleCreateChat(req: Request, userId: string) {
@@ -16,15 +17,17 @@ export async function handleCreateChat(req: Request, userId: string) {
     const dto = ChatCreateRequestDtoSchema.parse(body);
     const requestId = dto.requestId ?? createRequestId();
     const initialTitle = sanitizeCreateChatTitle(dto.title);
+    const cipher = await createUserChatCipher(userId);
 
     const chatId = crypto.randomUUID();
     const now = new Date().toISOString();
+    const encryptedTitle = await cipher.encrypt(initialTitle.title, 'chat_title', chatId);
 
     await batchExecute([
       {
         query:
           'INSERT INTO chats (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        params: [chatId, userId, initialTitle.title, now, now],
+        params: [chatId, userId, encryptedTitle, now, now],
       },
     ]);
 
@@ -66,9 +69,18 @@ export async function handleCreateChat(req: Request, userId: string) {
 
 /** Shared by GET `/api/chat` and RSC (initial chat list). */
 export async function listChatsForUser(userId: string): Promise<ChatListRow[]> {
-  return queryAll<ChatListRow>('SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC', [
-    userId,
-  ]);
+  const cipher = await createUserChatCipher(userId);
+  const rows = await queryAll<ChatListRow>(
+    'SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC',
+    [userId],
+  );
+
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      title: await cipher.decrypt(row.title, 'chat_title', row.id),
+    })),
+  );
 }
 
 export async function handleListChats(userId: string) {
@@ -89,10 +101,13 @@ export async function handleUpdateChatTitle(req: Request, chatId: string, userId
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const nextTitle = sanitizeUpdatedChatTitle(dto.title, row.title);
+    const cipher = await createUserChatCipher(userId);
+    const currentTitle = await cipher.decrypt(row.title, 'chat_title', row.id);
+    const nextTitle = sanitizeUpdatedChatTitle(dto.title, currentTitle);
     const now = new Date().toISOString();
+    const encryptedTitle = await cipher.encrypt(nextTitle.title, 'chat_title', chatId);
     await execute('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?', [
-      nextTitle.title,
+      encryptedTitle,
       now,
       chatId,
     ]);
@@ -151,10 +166,13 @@ export async function handleRenameChat(req: Request, chatId: string, userId: str
       return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const nextTitle = sanitizeUpdatedChatTitle(dto.title, row.title);
+    const cipher = await createUserChatCipher(userId);
+    const currentTitle = await cipher.decrypt(row.title, 'chat_title', row.id);
+    const nextTitle = sanitizeUpdatedChatTitle(dto.title, currentTitle);
     const now = new Date().toISOString();
+    const encryptedTitle = await cipher.encrypt(nextTitle.title, 'chat_title', chatId);
     await execute('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?', [
-      nextTitle.title,
+      encryptedTitle,
       now,
       chatId,
     ]);

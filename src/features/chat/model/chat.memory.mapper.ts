@@ -1,4 +1,5 @@
 import { ChatMemoryJsonSchema, type ChatMemory, type ChatMemoryJson } from './chat.memory.types';
+import { createUserChatCipher } from '@/shared/lib/security/chatEncryption';
 
 export type ChatMemoryRow = {
   chat_id: string;
@@ -8,24 +9,38 @@ export type ChatMemoryRow = {
   updated_at: string;
 };
 
-export function parseChatMemoryJson(raw: string | null): ChatMemoryJson | null {
-  if (!raw) {
+export async function parseChatMemoryJson(
+  raw: string | null,
+  userId: string,
+  chatId: string,
+): Promise<ChatMemoryJson | null> {
+  if (raw == null) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(raw);
+    const cipher = await createUserChatCipher(userId);
+    const decrypted = await cipher.decrypt(raw, 'chat_memory_summary_json', chatId);
+    const parsed = JSON.parse(decrypted);
     return ChatMemoryJsonSchema.parse(parsed);
   } catch {
     return null;
   }
 }
 
-export function mapChatMemoryRowToChatMemory(row: ChatMemoryRow): ChatMemory {
+export async function mapChatMemoryRowToChatMemory(
+  row: ChatMemoryRow,
+  userId: string,
+): Promise<ChatMemory> {
+  const cipher = await createUserChatCipher(userId);
   return {
     chatId: row.chat_id,
-    summaryText: row.summary_text,
-    summaryJson: parseChatMemoryJson(row.summary_json),
+    summaryText: await cipher.decryptNullable(
+      row.summary_text,
+      'chat_memory_summary_text',
+      row.chat_id,
+    ),
+    summaryJson: await parseChatMemoryJson(row.summary_json, userId, row.chat_id),
     lastSummarizedMessageId: row.last_summarized_message_id,
     updatedAt: row.updated_at,
   };
