@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { unstable_noStore as noStore } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { SignOutButton } from '@/features/auth/ui/SignOutButton';
@@ -18,6 +19,8 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function ProfilePage() {
+  noStore();
+
   const session = await auth();
   if (!session?.user) {
     redirect('/auth');
